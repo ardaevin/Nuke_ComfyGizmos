@@ -1,0 +1,61 @@
+{
+  "1": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "single",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {"title": "Source Plate - OCIO Read (one frame) [single frame]"}
+  },
+  "2": {
+    "inputs": {"fov": 60.0, "iterations": 5, "resolution": 1024, "image": ["1", 0]},
+    "class_type": "DSINE-NormalMapPreprocessor",
+    "_meta": {"title": "DSINE Normal Map"}
+  },
+  "3": {
+    "inputs": {"image": ["1", 0]},
+    "class_type": "GetImageSize",
+    "_meta": {"title": "Get Source Size"}
+  },
+  "4": {
+    "inputs": {"upscale_method": "lanczos", "width": ["3", 0], "height": ["3", 1], "crop": "disabled", "image": ["2", 0]},
+    "class_type": "ImageScale",
+    "_meta": {"title": "Back to Source Resolution"}
+  },
+  "5": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "16f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": true,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 25,
+      "render_nonce": "",
+      "images": ["4", 0]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {"title": "Normals Write - raw EXR"}
+  }
+}

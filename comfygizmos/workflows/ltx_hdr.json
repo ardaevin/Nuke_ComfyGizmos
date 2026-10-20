@@ -1,0 +1,26 @@
+{
+  "id": "ltx_hdr",
+  "label": "LTX SDR to HDR",
+  "description": "LTX-2.5 IC-LoRA SDR to HDR. Output: scene-linear HDR at plate resolution and frame numbers, no upper clip.",
+  "api": "ltx_hdr.api.json",
+  "suffix": "LTXHDR",
+  "max_frames": 241,
+  "max_frames_input": {"node": "9106", "input": "max_frames",
+                       "tooltip": "LTX-2.5 SDR to HDR runs up to 241 frames here; longer ranges need more VRAM."},
+
+  "read":  {"node": "9105"},
+  "write": {"node": "9109"},
+
+  "output": {"kind": "image", "colorspace": "ACES - ACES2065-1", "convert": true},
+
+  "knobs": [
+    {"name": "seed", "label": "seed", "type": "int", "node": "5516:4832", "input": "noise_seed", "default": 42},
+    {"name": "exposure", "label": "exposure", "type": "float", "node": "9012", "input": "exposure",
+     "default": 0.0, "min": -4.0, "max": 4.0, "tooltip": "Stops, applied when the HDR is decoded."},
+    {"name": "work_scale", "label": "work scale", "type": "float", "node": "9106", "input": "scale",
+     "default": 1.0, "min": 0.1, "max": 1.0,
+     "tooltip": "Working size inside the 3840x2176 limit (1.0 = native plate size). Lower = faster, softer."},
+    {"name": "lora_strength", "label": "LoRA strength", "type": "float", "node": "5004:5606",
+     "input": "strength_model", "default": 1.0, "min": 0.0, "max": 2.0}
+  ]
+}

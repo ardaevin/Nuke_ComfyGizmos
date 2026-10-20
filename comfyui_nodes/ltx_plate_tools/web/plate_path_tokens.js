@@ -6,7 +6,12 @@
 // e.g. output_folder = {plate_dir}/LTXAlpha   filename = {plate_name}_LTXAlpha
 //
 // Expanded only in the prompt that gets queued; the widgets keep the placeholders, so the
-// next plate loaded into the Read gets its own folder and name. A relative Read source
+// next plate loaded into the Read gets its own folder and name. OCIO Reads with the node
+// property ltx_single_frame = true are forced to frame_mode "single" in the queued prompt.
+// With several Reads upstream (start still, mask, look still), the one with node property
+// ltx_plate = true supplies the placeholders and, when the Write's auto_range is on, the
+// Write's frame range; otherwise the first Read found is used, as before.
+// A relative Read source
 // (a file in ComfyUI/input) has no absolute folder, so {plate_dir} becomes "" and the
 // Write falls back to ComfyUI/output.
 import { app } from "../../scripts/app.js";
@@ -18,17 +23,45 @@ function widget(node, name) {
     return node.widgets?.find((w) => w.name === name);
 }
 
-function upstreamRead(node, seen = new Set()) {
-    if (!node || seen.has(node.id)) return null;
+// Every OCIO Read upstream of node, in depth-first input order (OCIO Write's own auto_range uses
+// the first one, which is wrong when a start still or mask Read sits ahead of the plate).
+function upstreamReads(node, seen = new Set(), out = []) {
+    if (!node || seen.has(node.id)) return out;
     seen.add(node.id);
-    if (node.type === "OCIORead") return node;
+    if (node.type === "OCIORead") { out.push(node); return out; }
     for (const input of node.inputs || []) {
         if (input.link == null) continue;
         const link = app.graph.links[input.link] ?? app.graph.links.get?.(input.link);
-        const found = link && upstreamRead(app.graph.getNodeById(link.origin_id), seen);
-        if (found) return found;
+        if (link) upstreamReads(app.graph.getNodeById(link.origin_id), seen, out);
     }
-    return null;
+    return out;
+}
+
+// The Read that names and numbers the output: the one flagged ltx_plate, else the first found.
+function plateRead(node) {
+    const reads = upstreamReads(node);
+    return reads.find((r) => r.properties?.ltx_plate) || reads[0] || null;
+}
+
+// Mirror OCIO Write's syncWriteFromUpstream, but from the flagged plate Read.
+function plateRange(read) {
+    // A single picked frame (ltx_single_frame): name the one output frame after the source's
+    // own frame number (plate.1600.exr -> out.1600.exr). No number in the name -> leave as is.
+    if (read.properties?.ltx_single_frame) {
+        const base = String(widget(read, "source")?.value || "").replace(/\\/g, "/").split("/").pop();
+        const m = base.replace(/\.[^.]+$/, "").match(/[._](\d+)$/);
+        if (!m) return null;
+        const n = parseInt(m[1], 10);
+        return { source_start: n, first_frame: n, last_frame: n, start_number: n, fps: 0 };
+    }
+    const seq = read._ocioSeq;
+    if (!seq || seq.kind === "still") return null;
+    const v = (k) => widget(read, k)?.value || 0;
+    const s0 = v("start_frame") > 0 ? v("start_frame") : seq.start | 0;
+    const e0 = v("end_frame") > 0 ? v("end_frame") : seq.end | 0;
+    const first = v("frame_shift") > 0 ? v("frame_shift") : s0;
+    const last = first + Math.max(1, e0 - s0 + 1) - 1;
+    return { source_start: first, first_frame: first, last_frame: last, start_number: first, fps: v("fps") };
 }
 
 function plateParts(source) {
@@ -60,15 +93,36 @@ app.registerExtension({
         const original = app.graphToPrompt;
         app.graphToPrompt = async function (...args) {
             const result = await original.apply(this, args);
+            // OCIO Read flips frame_mode to "sequence" whenever the picked file has numbered siblings.
+            // Reads flagged ltx_single_frame (start still, look still) must load exactly that file.
+            for (const node of app.graph?._nodes || []) {
+                if (node.type !== "OCIORead" || !node.properties?.ltx_single_frame) continue;
+                const entry = result?.output?.[String(node.id)];
+                if (!entry) continue;
+                Object.assign(entry.inputs, { frame_mode: "single", start_frame: 0, end_frame: 0 });
+            }
             for (const node of app.graph?._nodes || []) {
                 if (node.type !== "OCIOWrite") continue;
                 const entry = result?.output?.[String(node.id)];
                 if (!entry) continue;
+                const read = plateRead(node);
+                // With a flagged plate Read, its frame range drives the Write (queued prompt + widgets).
+                if (read?.properties?.ltx_plate && entry.inputs.auto_range) {
+                    const r = plateRange(read);
+                    if (r) {
+                        for (const [k, v] of Object.entries(r)) {
+                            if (k === "fps" && !v) continue;
+                            entry.inputs[k] = v;
+                            const w = widget(node, k);
+                            if (w) w.value = v;
+                        }
+                        node.setDirtyCanvas?.(true, true);
+                    }
+                }
                 const keys = ["output_folder", "filename"].filter(
                     (k) => typeof entry.inputs[k] === "string" && TOKEN.test(entry.inputs[k])
                 );
                 if (!keys.length) continue;
-                const read = upstreamRead(node);
                 const source = read && widget(read, "source")?.value;
                 if (!source) {
                     throw new Error(

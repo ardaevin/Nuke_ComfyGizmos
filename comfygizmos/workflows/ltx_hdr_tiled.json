@@ -1,0 +1,27 @@
+{
+  "id": "ltx_hdr_tiled",
+  "label": "LTX SDR to HDR (Tiled)",
+  "description": "LTX-2.5 IC-LoRA SDR to HDR with Tiled Fusion: two stages, latent upscale x2. Output: scene-linear HDR at the upscaled size, plate frame numbers.",
+  "api": "ltx_hdr_tiled.api.json",
+  "suffix": "LTXHDRTiled",
+  "max_frames": 241,
+  "max_frames_input": {"node": "9326", "input": "max_frames",
+                       "tooltip": "LTX-2.5 SDR to HDR runs up to 241 frames here; longer ranges need more VRAM."},
+
+  "read":  {"node": "9325"},
+  "write": {"node": "9328"},
+
+  "output": {"kind": "image", "colorspace": "ACES - ACES2065-1", "convert": true},
+
+  "knobs": [
+    {"name": "seed", "label": "seed", "type": "int", "default": 42,
+     "targets": [{"node": "5516:9100", "input": "seed"}, {"node": "9019:9312", "input": "seed"}]},
+    {"name": "exposure", "label": "exposure", "type": "float", "node": "5518:5590", "input": "exposure",
+     "default": 0.0, "min": -4.0, "max": 4.0, "tooltip": "Stops, applied when the HDR is decoded."},
+    {"name": "work_scale", "label": "work scale", "type": "float", "node": "9326", "input": "scale",
+     "default": 1.0, "min": 0.1, "max": 1.0,
+     "tooltip": "Working size inside the 3840x2176 limit before the x2 upscale. Lower = faster."},
+    {"name": "lora_strength", "label": "LoRA strength", "type": "float", "default": 1.0, "min": 0.0, "max": 2.0,
+     "targets": [{"node": "5004:5606", "input": "strength_model"}, {"node": "5004:5607", "input": "strength_model"}]}
+  ]
+}

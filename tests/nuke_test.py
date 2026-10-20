@@ -49,7 +49,7 @@ up.setSelected(True)
 g = comfygizmos.create("ltx_alpha")
 g.setInput(0, up)
 if via_render:
-    g["cg_source"].setValue("render input")
+    g["cg_name"].setValue("TestGrade")             # not a plain Read: Name is required
 
 # output root: a reference to the project directory, resolved at render time
 check(g["cg_out_root"].value() == "[value root.project_directory]/Comp/Inputs/ComfyUI",
@@ -70,7 +70,7 @@ check(job is not None, "sent and finished")
 result = g["cg_result"].value()
 want_dir = "{}/Comp/Inputs/ComfyUI/".format(project_dir.rstrip("/"))
 check(result.startswith(want_dir), "output under <project>/Comp/Inputs/ComfyUI: " + result)
-check(result.endswith("_LTXAlpha_acescg.%04d.exr"), "named ..._LTXAlpha_acescg.%04d.exr")
+check(result.endswith("_LTXAlpha_v001_acescg.%04d.exr") and "/outputs/" in result, "outputs/..._LTXAlpha_v001_acescg.%04d.exr")
 files = [result % f for f in range(first, last + 1)]
 check(all(os.path.isfile(f) for f in files), "all {} frames on disk".format(count))
 check("frames {}-{}".format(first, last) in g["cg_status"].value(), "status reports the loaded range")
@@ -119,7 +119,7 @@ if br is not None:
     check(br.xpos() == g.xpos() + 150, "  placed next to the gizmo")
 
 if via_render:
-    src = glob.glob(os.path.join(project_dir, "Comp", "Inputs", "ComfyUI", "_source", "*", "*.exr"))
+    src = glob.glob(os.path.join(project_dir, "Comp", "Inputs", "ComfyUI", "sources", "*", "*.exr"))
     check(len(src) == count, "rendered input: {} source frames".format(len(src)))
 
 nuke.scriptSaveAs(os.path.join(project_dir, "comfygizmos_test.nk"), overwrite=1)

@@ -38,7 +38,13 @@ class LTXPlatePrep:
                                     "tooltip": "Extra downscale for speed / VRAM (1.0 = largest size that fits)."}),
                 "max_frames": ("INT", {"default": 145, "min": 1, "max": 100000,
                                        "tooltip": "Refuse longer ranges. Alpha Gen leaks RGB into the matte above 145 frames: split the shot."}),
-            }
+            },
+            "optional": {
+                "spatial_pad": ("BOOLEAN", {"default": True,
+                                            "tooltip": "Pad width/height to multiples of 32. Turn OFF for Tiled Fusion "
+                                                       "workflows: they fit the plate to their own canvas, and a padded "
+                                                       "aspect makes them pick a different (larger) canvas."}),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "INT", "INT", "INT", "INT", "INT", "INT", "INT", "INT", "STRING")
@@ -47,7 +53,7 @@ class LTXPlatePrep:
     FUNCTION = "run"
     CATEGORY = "image/LTX plate"
 
-    def run(self, images, max_width, max_height, scale, max_frames):
+    def run(self, images, max_width, max_height, scale, max_frames, spatial_pad=True):
         n, h0, w0 = images.shape[0], images.shape[1], images.shape[2]
         if n > max_frames:
             raise ValueError(f"Plate Prep: {n} frames is over the {max_frames}-frame limit. "
@@ -55,7 +61,7 @@ class LTXPlatePrep:
         s = min(1.0, max_width / w0, max_height / h0) * scale
         ww, wh = max(32, int(round(w0 * s / 2) * 2)), max(32, int(round(h0 * s / 2) * 2))
         x = _resize(images, ww, wh)
-        pw, ph = (-ww) % 32, (-wh) % 32
+        pw, ph = ((-ww) % 32, (-wh) % 32) if spatial_pad else (0, 0)
         if pw or ph:  # replicate edges: no hard black border for the model to matte
             x = F.pad(x.movedim(-1, 1), (0, pw, 0, ph), mode="replicate").movedim(1, -1)
         pf = (1 - n) % 8
@@ -83,6 +89,15 @@ class LTXPlateRestore:
                 "range": (["0-1 (matte / SDR)", "HDR (no upper clip)"],
                           {"default": "0-1 (matte / SDR)",
                            "tooltip": "HDR keeps scene-linear values above 1.0 when scaling back to plate size."}),
+                "padded_width": ("INT", {"default": 0, "min": 0, "max": 16384, "forceInput": True,
+                                         "tooltip": "Plate Prep's width output. Unconnected = assume pad to /32."}),
+                "padded_height": ("INT", {"default": 0, "min": 0, "max": 16384, "forceInput": True,
+                                          "tooltip": "Plate Prep's height output. Unconnected = assume pad to /32."}),
+                "output_size": (["plate size", "keep upscale"],
+                                {"default": "plate size",
+                                 "tooltip": "keep upscale: when the model returns a larger image than Plate Prep "
+                                            "sent (e.g. Tiled Fusion's 2x/4x), output the plate aspect at that "
+                                            "larger size instead of scaling back down."}),
             },
         }
 
@@ -92,9 +107,20 @@ class LTXPlateRestore:
     CATEGORY = "image/LTX plate"
 
     def run(self, images, orig_frames, orig_width, orig_height, work_width, work_height,
-            range="0-1 (matte / SDR)"):
-        x = images[:orig_frames, :work_height, :work_width, :3]
-        x = _resize(x, orig_width, orig_height, hdr=range.startswith("HDR"))
+            range="0-1 (matte / SDR)", output_size="plate size", padded_width=0, padded_height=0):
+        # Plate Prep padded work_* up to the next multiple of 32. The model may hand back that
+        # canvas at another size (Tiled Fusion upscales, and may stretch to its own canvas), so
+        # crop the pad off proportionally per axis rather than by pixel count.
+        pad_w = padded_width or work_width + (-work_width) % 32
+        pad_h = padded_height or work_height + (-work_height) % 32
+        crop_w = max(1, round(work_width * images.shape[2] / pad_w))
+        crop_h = max(1, round(work_height * images.shape[1] / pad_h))
+        x = images[:orig_frames, :crop_h, :crop_w, :3]
+        w, h = orig_width, orig_height
+        if output_size == "keep upscale":
+            k = crop_w / work_width  # model scale factor relative to the plate-sized work area
+            w, h = max(2, int(round(orig_width * k / 2) * 2)), max(2, int(round(orig_height * k / 2) * 2))
+        x = _resize(x, w, h, hdr=range.startswith("HDR"))
         return (x, x[..., 0].clone())
 
 

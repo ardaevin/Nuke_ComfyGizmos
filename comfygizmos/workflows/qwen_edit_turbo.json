@@ -1,0 +1,164 @@
+{
+  "id": "qwen_edit_turbo",
+  "label": "Qwen Image Edit (Turbo)",
+  "description": "Qwen-Image 2.1 Turbo edit of one frame by a text prompt (fixed fast schedule), with up to 3 reference images. Output: the edited frame at plate size.",
+  "api": "qwen_edit_turbo.api.json",
+  "suffix": "QwenEditTurbo",
+  "frames": "single",
+  "input_name": "plate",
+  "read": {
+    "node": "508"
+  },
+  "write": {
+    "node": "511"
+  },
+  "refs": [
+    {
+      "name": "ref2",
+      "targets": [
+        {
+          "node": "459:474",
+          "input": "images.image_2"
+        },
+        {
+          "node": "459:485",
+          "input": "images.image1"
+        }
+      ]
+    },
+    {
+      "name": "ref3",
+      "targets": [
+        {
+          "node": "459:474",
+          "input": "images.image_3"
+        },
+        {
+          "node": "459:485",
+          "input": "images.image2"
+        }
+      ]
+    },
+    {
+      "name": "ref4",
+      "targets": [
+        {
+          "node": "459:474",
+          "input": "images.image_4"
+        },
+        {
+          "node": "459:485",
+          "input": "images.image3"
+        }
+      ]
+    }
+  ],
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "Qwen works on display-referred (sRGB Texture) images, so values above 1.0 are clipped. Comp the edit back over the plate only where it changed."
+  },
+  "enhancer": {
+    "after": "refine_prompt",
+    "output_node": "459:480",
+    "force": [
+      {
+        "node": "459:484",
+        "input": "switch",
+        "value": true
+      },
+      {
+        "node": "459:500",
+        "input": "thinking",
+        "value": true
+      }
+    ]
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "targets": [
+        {
+          "node": "459:484",
+          "input": "on_false"
+        },
+        {
+          "node": "459:500",
+          "input": "prompt"
+        }
+      ],
+      "tooltip": "The edit instruction. The plate is <image1>; the ref2-ref4 inputs are <image2>-<image4>."
+    },
+    {
+      "name": "refine_prompt",
+      "label": "refine prompt",
+      "type": "bool",
+      "default": false,
+      "targets": [
+        {
+          "node": "459:484",
+          "input": "switch"
+        },
+        {
+          "node": "459:500",
+          "input": "thinking"
+        }
+      ],
+      "tooltip": "Let the Qwen prompt enhancer rewrite the instruction first (slower, usually better). Turns on its thinking pass too."
+    },
+    {
+      "name": "resolution",
+      "label": "resolution",
+      "type": "int",
+      "default": 0,
+      "node": "459:474",
+      "input": "resolution",
+      "tooltip": "Pixel budget (aspect kept). 0 = the plate's own size; up to 2048 (use 2048 for 4K plates). The result is scaled back to plate size."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "459:504",
+          "input": "noise_seed"
+        },
+        {
+          "node": "459:500",
+          "input": "sampling_mode.seed"
+        }
+      ]
+    },
+    {
+      "name": "cfg",
+      "label": "cfg",
+      "type": "float",
+      "default": 1.0,
+      "min": 1.0,
+      "max": 10.0,
+      "node": "459:507",
+      "input": "cfg",
+      "tooltip": "Keep 1 (official). Raise it only together with a negative prompt."
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "divider"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "459:474",
+      "input": "negative_prompt",
+      "tooltip": "Only used when cfg is above 1."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "dsine_normals",
+  "label": "DSINE Normals",
+  "description": "DSINE single-frame surface normals (camera space). Output: raw EXR at plate size, 0-1 encoded; the node shows them decoded to -1..1.",
+  "api": "dsine_normals.api.json",
+  "suffix": "DSINENormal",
+  "frames": "single",
+  "input_name": "plate",
+
+  "read":  {"node": "1"},
+  "write": {"node": "5"},
+
+  "output": {"kind": "normals", "raw": true,
+             "tooltip": "Normals are vectors, not colour: written and read as raw. DSINE's own output is 8-bit, so the half-float EXR adds no precision."},
+
+  "knobs": [
+    {"name": "fov", "label": "fov", "type": "float", "node": "2", "input": "fov", "default": 60.0, "min": 1.0, "max": 180.0,
+     "tooltip": "Horizontal field of view of the lens in degrees (DSINE is camera-aware). Desqueeze anamorphic first."},
+    {"name": "iterations", "label": "iterations", "type": "int", "node": "2", "input": "iterations", "default": 5,
+     "tooltip": "Refinement passes (1-20). Raise for detailed scenes."},
+    {"name": "resolution", "label": "resolution", "type": "int", "node": "2", "input": "resolution", "default": 1024,
+     "tooltip": "Processing resolution, step 64. Higher = more detail, more VRAM. The result is scaled back to plate size."}
+  ]
+}
