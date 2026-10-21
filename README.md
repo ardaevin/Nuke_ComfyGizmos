@@ -17,6 +17,7 @@ The node talks to ComfyUI's HTTP API directly. The Nuke side is pure Python
 | **Qwen Image Edit** | Edits one frame from a text prompt, with up to 3 reference images (Qwen-Image 2.1) | single | ACES2065-1 |
 | **Qwen Image Edit (Turbo)** | Same, with the fixed 8-step Turbo model | single | ACES2065-1 |
 | **DSINE Normals** | Camera-space surface normals | single | raw EXR, decoded to -1..1 in the node |
+| **Nano Banana 2** | Edits one frame from a text prompt, with up to 5 reference images (Gemini 3.1 Flash Image on Google Vertex AI; paid per render) | single | ACES2065-1 |
 
 ## Requirements
 
@@ -37,6 +38,7 @@ Per gizmo:
 | Qwen Image Edit | `ltx_plate_tools` | `diffusion_models/qwen_image_2.1_int8_convrot.safetensors`, `vae/qwen_image_2.1_vae_bf16.safetensors`, `text_encoders/qwen3vl_8b_int8_convrot.safetensors`, `text_encoders/qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors` (prompt enhancer) |
 | Qwen Image Edit (Turbo) | `ltx_plate_tools` | as above, with `diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors` |
 | DSINE Normals | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) | DSINE (downloaded by the pack on first use) |
+| Nano Banana 2 | [comfyui-google-genmedia-custom-nodes](https://github.com/GoogleCloudPlatform/comfyui-google-genmedia-custom-nodes), `ltx_plate_tools` | none local: it calls Vertex AI. You need a Google Cloud project with Vertex AI enabled, signed in with `gcloud auth application-default login` |
 
 The Lightricks repos on Hugging Face are gated, so accept the licence first.
 ComfyUI only lists `embeddings/` at startup, so restart it after adding the
@@ -49,6 +51,9 @@ scene embedding.
    - Copy `comfyui_nodes/_ltx_no_image_placeholder.png` into `ComfyUI/input/`.
      LTX Alpha Gen's optional start-image input needs it; the image isn't
      used for the matte.
+   - `ltx_plate_tools` holds Plate Prep and Plate Restore (fit, pad and scale
+     back to the plate) and Plate Aspect Pad, which pads a plate to the
+     nearest aspect ratio Nano Banana accepts instead of stretching it.
    - Restart ComfyUI.
 2. **Nuke side**
    - Run `python install.py`. It copies `comfygizmos` to `~/.nuke/python/`,
@@ -73,7 +78,7 @@ needed, and press **Render in ComfyUI**. The render runs in the background and
 ### Inputs
 
 The **input** (or source) is whatever is connected to the gizmo. On the Qwen
-gizmos the `ref2`-`ref4` reference inputs count as inputs too.
+and Nano Banana gizmos the `ref` reference inputs count as inputs too.
 
 - **A plain Read**, connected straight in with no frame offset, is sent to
   ComfyUI as it is. Nothing is rendered.
@@ -85,7 +90,7 @@ gizmos the `ref2`-`ref4` reference inputs count as inputs too.
 **Name**, at the top, names everything the node writes. It's required unless
 the input is a plain Read; with a plain Read and Name left empty, the plate's
 file name is used. The gizmo name is fixed per gizmo: `LTXAlpha`, `LTXHDR`,
-`LTXHDRTiled`, `QwenEdit`, `QwenEditTurbo` or `DSINENormal`.
+`LTXHDRTiled`, `QwenEdit`, `QwenEditTurbo`, `DSINENormal` or `NanoBanana2`.
 
 ### Folders and versions
 
@@ -152,6 +157,35 @@ name comes from OCIO Write.
     Comp the edit back over the plate only where it changed.
 - **DSINE Normals**: fov, iterations and resolution. **output** is
   `normals -1..1` or `encoded 0..1`.
+- **Nano Banana 2**:
+  - **prompt** is the edit instruction. The plate is image 1; the `ref2`-`ref6`
+    inputs are images 2-6.
+  - **image size** (512px-4K) is the size Nano Banana renders at; the result
+    is scaled back to plate size, and bigger sizes cost more. **temperature**
+    controls randomness. There's no seed, so every render differs.
+  - **advanced** (closed by default) holds top p, top k, a system instruction
+    and the **GCP project**. That project is billed; leave it empty to use the
+    `GOOGLE_CLOUD_PROJECT` environment variable, or set your own default (see
+    Local defaults).
+  - The plate is padded to the nearest aspect ratio Nano Banana supports, and
+    the padding is cropped off afterwards. Values above 1.0 are clipped and the
+    whole frame is regenerated, so comp the edit back only where it changed.
+
+### Local defaults
+
+Machine- or account-specific defaults live in `~/.nuke/comfygizmos_prefs.json`
+rather than in the repo:
+
+```json
+{
+  "host": "http://127.0.0.1:8188",
+  "output_subpath": "Comp/Inputs/ComfyUI",
+  "knob_defaults": {"nano_banana2": {"gcp_project": "your-gcp-project"}}
+}
+```
+
+`knob_defaults` sets the starting value of any knob, per workflow id, on newly
+created nodes.
 
 ## Adding a workflow
 
@@ -169,7 +203,11 @@ name comes from OCIO Write.
    - the output kind (`matte` / `image` / `normals`) and colorspace
    - optional `refs` and `enhancer`
    - the knobs to expose: each one is a `node` + `input` in the API graph, or
-     a list of `targets` when one knob drives several nodes
+     a list of `targets` when one knob drives several nodes. Types are `int`,
+     `float`, `bool`, `string`, `multiline` and `choice` (with `values`). Two
+     types only lay out the panel: `divider` (a heading) and `group` (a closed
+     section up to the next group). `env_fallback` names an environment
+     variable that is used when the knob is left empty.
 5. Run `python install.py` and restart Nuke.
 
 ## Tests
@@ -182,5 +220,6 @@ because Nuke reads bare numbers as a frame range.
 - `nuke_test_naming.py`: Name, sources/outputs, and the source and output
   versions.
 - `nuke_test.py`, `nuke_test_workflow.py`, `nuke_test_qwen.py`,
-  `nuke_test_normals.py`: end-to-end per gizmo.
+  `nuke_test_normals.py`: end-to-end per gizmo. Nano Banana 2 has no test,
+  because every run is a paid API call.
 - `test_colorspace.py`: colorspace name matching against the live ComfyUI.

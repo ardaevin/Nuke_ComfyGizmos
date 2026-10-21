@@ -1,0 +1,154 @@
+{
+  "2": {
+    "inputs": {
+      "model": "GEMINI_31_FLASH_IMAGE",
+      "prompt": "",
+      "aspect_ratio": [
+        "9",
+        1
+      ],
+      "image_size": "4K",
+      "output_mime_type": "PNG",
+      "temperature": 0.7,
+      "top_p": 1,
+      "top_k": 32,
+      "harassment_threshold": "BLOCK_NONE",
+      "hate_speech_threshold": "BLOCK_NONE",
+      "sexually_explicit_threshold": "BLOCK_NONE",
+      "dangerous_content_threshold": "BLOCK_NONE",
+      "system_instruction": "",
+      "gcp_project_id": "",
+      "gcp_region": "global",
+      "image1": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "Gemini31FlashImage",
+    "_meta": {
+      "title": "Nano Banana 2 (Gemini 3.1 Flash Image) - paid Vertex AI"
+    }
+  },
+  "6": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "single",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {
+      "title": "Source Plate - OCIO Read (one frame: EXR / PNG / seq frame) [single frame]"
+    }
+  },
+  "7": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "16f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": false,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 24,
+      "render_nonce": "",
+      "images": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {
+      "title": "Edit Write - ACES2065-1 EXR (named after the plate frame)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "max_width": 8192,
+      "max_height": 8192,
+      "scale": 1,
+      "max_frames": 1,
+      "spatial_pad": false,
+      "images": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "LTXPlatePrep",
+    "_meta": {
+      "title": "Plate Prep (records plate size; no padding)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "PlateAspectPad",
+    "_meta": {
+      "title": "Plate Aspect Pad (nearest Nano Banana ratio; drives aspect_ratio)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "range": "0-1 (matte / SDR)",
+      "output_size": "plate size",
+      "images": [
+        "2",
+        0
+      ],
+      "orig_frames": [
+        "8",
+        4
+      ],
+      "orig_width": [
+        "8",
+        5
+      ],
+      "orig_height": [
+        "8",
+        6
+      ],
+      "work_width": [
+        "8",
+        7
+      ],
+      "work_height": [
+        "8",
+        8
+      ],
+      "padded_width": [
+        "9",
+        2
+      ],
+      "padded_height": [
+        "9",
+        3
+      ]
+    },
+    "class_type": "LTXPlateRestore",
+    "_meta": {
+      "title": "Plate Restore (back to exact plate size)"
+    }
+  }
+}

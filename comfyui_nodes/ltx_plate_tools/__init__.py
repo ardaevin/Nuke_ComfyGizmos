@@ -6,6 +6,9 @@ Plate Prep    : fit a plate inside the model's max size (aspect kept, never upsc
 Plate Restore : undo all of that on the result - drop pad frames and pad pixels, then scale
                 back to the plate's original resolution - so the output lines up 1:1 with
                 the source frames in comp.
+Plate Aspect Pad : for models with a fixed aspect-ratio list (Gemini / Nano Banana 2): pad the
+                plate (right / bottom, edge-replicate) up to the nearest listed ratio and hand that
+                ratio to the model, so Plate Restore crops the pad off instead of stretching.
 
 web/plate_path_tokens.js : {plate_dir} / {plate_name} placeholders for OCIO Write's
                 output_folder / filename, filled from the upstream OCIO Read at queue time.
@@ -124,8 +127,47 @@ class LTXPlateRestore:
         return (x, x[..., 0].clone())
 
 
-NODE_CLASS_MAPPINGS = {"LTXPlatePrep": LTXPlatePrep, "LTXPlateRestore": LTXPlateRestore}
+# Same list (same order) as the Google GenMedia pack's GEMINI_31_FLASH_IMAGE_ASPECT_RATIO, so the
+# aspect_ratio output validates against Gemini31FlashImage's aspect_ratio combo.
+GEMINI_31_ASPECT_RATIOS = ["1:1", "1:4", "4:1", "1:8", "8:1", "2:3", "3:2", "3:4", "4:3",
+                           "4:5", "5:4", "9:16", "16:9", "21:9"]
+
+
+class PlateAspectPad:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"images": ("IMAGE",)}}
+
+    RETURN_TYPES = ("IMAGE", GEMINI_31_ASPECT_RATIOS, "INT", "INT", "STRING")
+    RETURN_NAMES = ("images", "aspect_ratio", "padded_width", "padded_height", "info")
+    FUNCTION = "run"
+    CATEGORY = "image/LTX plate"
+
+    def run(self, images):
+        h, w = images.shape[1], images.shape[2]
+        best = None
+        for name in GEMINI_31_ASPECT_RATIOS:
+            a, b = (int(v) for v in name.split(":"))
+            # only ever pad (grow one axis), never crop the plate
+            if a * h >= b * w:
+                pw, ph = -(-h * a // b), h
+            else:
+                pw, ph = w, -(-w * b // a)
+            if best is None or pw * ph < best[1] * best[2]:
+                best = (name, pw, ph)
+        name, pw, ph = best
+        x = images
+        if pw > w or ph > h:
+            x = F.pad(x.movedim(-1, 1), (0, pw - w, 0, ph - h), mode="replicate").movedim(1, -1)
+        info = f"plate {w}x{h} ({w / h:.3f}) -> {name}, padded {pw}x{ph}"
+        print(f"[Plate Aspect Pad] {info}")
+        return (x, name, pw, ph, info)
+
+
+NODE_CLASS_MAPPINGS = {"LTXPlatePrep": LTXPlatePrep, "LTXPlateRestore": LTXPlateRestore,
+                       "PlateAspectPad": PlateAspectPad}
 NODE_DISPLAY_NAME_MAPPINGS = {"LTXPlatePrep": "LTX Plate Prep (local)",
-                              "LTXPlateRestore": "LTX Plate Restore (local)"}
+                              "LTXPlateRestore": "LTX Plate Restore (local)",
+                              "PlateAspectPad": "Plate Aspect Pad (local)"}
 
 WEB_DIRECTORY = "./web"

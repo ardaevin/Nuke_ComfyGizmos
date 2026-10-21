@@ -224,8 +224,12 @@ def _add_knobs(group, wf):
     if wf.get("knobs"):
         k(nuke.Text_Knob("cg_div_wf", "settings"))
     enh = wf.get("enhancer")
+    group_open = False
     for spec in wf.get("knobs", []):
-        k(_make_knob(spec))
+        if spec["type"] == "group" and group_open:   # a new group closes the previous one
+            k(nuke.Tab_Knob("wf_group_end_" + spec["name"], "", nuke.TABENDGROUP))
+        group_open = group_open or spec["type"] == "group"
+        k(_make_knob(_local_default(wf, spec)))
         if enh and spec["name"] == enh.get("after"):
             run = nuke.PyScript_Knob("cg_enhance", "Run enhancer only", "comfygizmos.enhance(nuke.thisNode())")
             run.setTooltip("Only the prompt enhancer runs (no image is made). Its rewrite lands in 'refined prompt'.")
@@ -235,6 +239,8 @@ def _add_knobs(group, wf):
             use.setTooltip("Copy the refined prompt into 'prompt' and turn 'refine prompt' off.")
             k(use)
             k(nuke.Multiline_Eval_String_Knob("cg_refined", "refined prompt", ""))
+    if group_open:
+        k(nuke.Tab_Knob("wf_group_end", "", nuke.TABENDGROUP))
 
     k(nuke.Text_Knob("cg_div_out", "output"))
     out_root = nuke.File_Knob("cg_out_root", "output root")
@@ -300,10 +306,21 @@ def _knob_value(knob):
     return knob.value()
 
 
+def _local_default(wf, spec):
+    """A knob default from ~/.nuke/comfygizmos_prefs.json ("knob_defaults": {workflow id: {knob: value}}) -
+    for machine/account values that must not ship in the manifest (e.g. a GCP project)."""
+    local = (prefs().get("knob_defaults") or {}).get(wf["id"], {})
+    if spec.get("name") in local:
+        spec = dict(spec, default=local[spec["name"]])
+    return spec
+
+
 def _make_knob(spec):
     name, label, kind = "wf_" + spec["name"], spec.get("label", spec["name"]), spec["type"]
     if kind == "divider":
         return nuke.Text_Knob("wf_" + spec["name"], label)
+    if kind == "group":                              # collapsible (closed) section up to the next group / the end
+        return nuke.Tab_Knob(name, label, nuke.TABBEGINCLOSEDGROUP)
     if kind == "multiline":
         knob = nuke.Multiline_Eval_String_Knob(name, label, str(spec.get("default", "")))
     elif kind == "int":
@@ -316,6 +333,9 @@ def _make_knob(spec):
     elif kind == "bool":
         knob = nuke.Boolean_Knob(name, label, bool(spec.get("default", False)))
         knob.setFlag(nuke.STARTLINE)
+    elif kind == "choice":
+        knob = nuke.Enumeration_Knob(name, label, spec["values"])
+        knob.setValue(str(spec.get("default", spec["values"][0])))
     else:
         knob = nuke.String_Knob(name, label, str(spec.get("default", "")))
     if spec.get("tooltip"):
@@ -721,9 +741,11 @@ def _fill_graph(wf, group, src_path, raw, comfy_cs, first, last, out_dir, stem, 
         prompt[mfi["node"]]["inputs"][mfi["input"]] = _max_frames(group, wf)
 
     for spec in wf.get("knobs", []):
-        if spec["type"] == "divider":
+        if spec["type"] in ("divider", "group"):
             continue
         val = _knob_value(group["wf_" + spec["name"]])
+        if not val and spec.get("env_fallback"):     # e.g. an empty GCP project -> GOOGLE_CLOUD_PROJECT
+            val = os.environ.get(spec["env_fallback"], "")
         if spec["type"] == "int":
             val = int(val)
         elif spec["type"] == "float":
