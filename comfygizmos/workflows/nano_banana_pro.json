@@ -1,0 +1,148 @@
+{
+  "id": "nano_banana_pro",
+  "label": "Nano Banana Pro",
+  "description": "Gemini 3 Pro Image (Nano Banana Pro) edit of one frame by a text prompt, with up to 5 reference images. Paid Google Vertex AI call per render (more than Nano Banana 2). Output: the edited frame at plate size.",
+  "api": "nano_banana_pro.api.json",
+  "suffix": "NanoBananaPro",
+  "frames": "single",
+  "input_name": "plate",
+  "read": {
+    "node": "6"
+  },
+  "write": {
+    "node": "7"
+  },
+  "refs": [
+    {
+      "name": "ref2",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image2"
+        }
+      ]
+    },
+    {
+      "name": "ref3",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image3"
+        }
+      ]
+    },
+    {
+      "name": "ref4",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image4"
+        }
+      ]
+    },
+    {
+      "name": "ref5",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image5"
+        }
+      ]
+    },
+    {
+      "name": "ref6",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image6"
+        }
+      ]
+    }
+  ],
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "Nano Banana Pro works on display-referred (sRGB Texture) images, so values above 1.0 are clipped, and it regenerates the whole frame. Comp the edit back over the plate only where it changed."
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "2",
+      "input": "prompt",
+      "tooltip": "The edit instruction. The plate is the first image; ref2-ref6 are images 2-6."
+    },
+    {
+      "name": "image_size",
+      "label": "image size",
+      "type": "choice",
+      "values": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "default": "4K",
+      "node": "2",
+      "input": "image_size",
+      "tooltip": "Resolution Nano Banana Pro renders at. The result is scaled back to plate size, so on a 4K plate 1K is upscaled ~3.5x. Bigger costs more."
+    },
+    {
+      "name": "temperature",
+      "label": "temperature",
+      "type": "float",
+      "default": 0.7,
+      "min": 0.0,
+      "max": 1.0,
+      "node": "2",
+      "input": "temperature",
+      "tooltip": "Randomness. Lower = more literal edits that change less between renders; higher = more varied. There is no seed, so every render differs."
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "top_p",
+      "label": "top p",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1.0,
+      "node": "2",
+      "input": "top_p",
+      "tooltip": "Only sample from the most likely options adding up to this probability. 1 = no cut."
+    },
+    {
+      "name": "top_k",
+      "label": "top k",
+      "type": "int",
+      "default": 32,
+      "node": "2",
+      "input": "top_k",
+      "tooltip": "Only sample from the k most likely options."
+    },
+    {
+      "name": "system_instruction",
+      "label": "system instruction",
+      "type": "multiline",
+      "default": "",
+      "node": "2",
+      "input": "system_instruction",
+      "tooltip": "Optional standing instruction for every render, e.g. 'keep the camera framing and lighting unchanged'."
+    },
+    {
+      "name": "gcp_project",
+      "label": "GCP project",
+      "type": "string",
+      "default": "",
+      "env_fallback": "GOOGLE_CLOUD_PROJECT",
+      "node": "2",
+      "input": "gcp_project_id",
+      "tooltip": "Google Cloud project billed for the Vertex AI call. Empty = the GOOGLE_CLOUD_PROJECT environment variable. Set your own default in ~/.nuke/comfygizmos_prefs.json: {\"knob_defaults\": {\"nano_banana_pro\": {\"gcp_project\": \"your-project\"}}}"
+    }
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "id": "gemini31_pro",
+  "label": "Gemini 3.1 Pro",
+  "description": "Ask Gemini 3.1 Pro about a frame, a frame range (sent as video) or just a prompt. Text out only: the reply lands in 'reply' below, the plate passes through. Paid Google Vertex AI call per run.",
+  "api": "gemini31_pro.api.json",
+  "suffix": "Gemini31Pro",
+  "default_name": "Chat",
+  "frames": "send",
+  "max_frames": 600,
+  "max_frames_input": {
+    "node": "8",
+    "input": "max_frames",
+    "tooltip": "Video only. Gemini samples video at about 1 frame per second; long clips cost more."
+  },
+  "input_name": "plate",
+  "read": {
+    "node": "6"
+  },
+  "write": {
+    "node": "7"
+  },
+  "media": {
+    "node": "2",
+    "prep": "8",
+    "frame": {
+      "input": "image_file_path",
+      "mime_input": "image_mime_type",
+      "mime": "image/png",
+      "max_size": 2048,
+      "write": {
+        "container": "still image",
+        "still_format": "png",
+        "bit_depth": "8"
+      }
+    },
+    "range": {
+      "input": "video_file_path",
+      "mime_input": "video_mime_type",
+      "mime": "video/mp4",
+      "max_size": 1280,
+      "write": {
+        "container": "video",
+        "video_codec": "h264",
+        "bit_depth": "8"
+      }
+    }
+  },
+  "output": {
+    "kind": "text",
+    "text_node": "11",
+    "raw": true
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "2",
+      "input": "prompt",
+      "tooltip": "Your question or instruction, e.g. 'describe this shot' or 'write a Nano Banana prompt that adds rain to this frame'."
+    },
+    {
+      "name": "model",
+      "label": "model",
+      "type": "choice",
+      "values": [
+        "GEMINI_31_PRO",
+        "GEMINI_3_FLASH",
+        "GEMINI_31_FLASH_LITE"
+      ],
+      "labels": [
+        "Gemini 3.1 Pro",
+        "Gemini 3 Flash",
+        "Gemini 3.1 Flash Lite"
+      ],
+      "default": "GEMINI_31_PRO",
+      "node": "2",
+      "input": "model",
+      "tooltip": "3.1 Pro: best answers. 3 Flash: faster and cheaper. 3.1 Flash Lite: cheapest."
+    },
+    {
+      "name": "temperature",
+      "label": "temperature",
+      "type": "float",
+      "default": 0.7,
+      "min": 0.0,
+      "max": 1.0,
+      "node": "2",
+      "input": "temperature",
+      "tooltip": "Randomness. Lower = more factual and repeatable; higher = more varied wording and ideas."
+    },
+    {
+      "name": "max_output_tokens",
+      "label": "max output tokens",
+      "type": "int",
+      "default": 8192,
+      "node": "2",
+      "input": "max_output_tokens",
+      "tooltip": "Longest reply (1-8192 tokens; ~750 words per 1000 tokens)."
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "top_p",
+      "label": "top p",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1.0,
+      "node": "2",
+      "input": "top_p",
+      "tooltip": "Only sample from the most likely options adding up to this probability. 1 = no cut."
+    },
+    {
+      "name": "top_k",
+      "label": "top k",
+      "type": "int",
+      "default": 32,
+      "node": "2",
+      "input": "top_k",
+      "tooltip": "Only sample from the k most likely options (1-64)."
+    },
+    {
+      "name": "system_instruction",
+      "label": "system instruction",
+      "type": "multiline",
+      "default": "",
+      "node": "2",
+      "input": "system_instruction",
+      "tooltip": "Optional standing instruction for every run, e.g. 'You are a VFX supervisor. Answer briefly.'"
+    },
+    {
+      "name": "gcp_project",
+      "label": "GCP project",
+      "type": "string",
+      "default": "",
+      "env_fallback": "GOOGLE_CLOUD_PROJECT",
+      "node": "2",
+      "input": "gcp_project_id",
+      "tooltip": "Google Cloud project billed for the Vertex AI call. Empty = the GOOGLE_CLOUD_PROJECT environment variable. Set your own default in ~/.nuke/comfygizmos_prefs.json: {\"knob_defaults\": {\"gemini31_pro\": {\"gcp_project\": \"your-project\"}}}"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ Plate Restore : undo all of that on the result - drop pad frames and pad pixels,
 Plate Aspect Pad : for models with a fixed aspect-ratio list (Gemini / Nano Banana 2): pad the
                 plate (right / bottom, edge-replicate) up to the nearest listed ratio and hand that
                 ratio to the model, so Plate Restore crops the pad off instead of stretching.
+                The "- Gemini Pro" variant uses Gemini 3 Pro Image's (Nano Banana Pro) shorter list.
 
 web/plate_path_tokens.js : {plate_dir} / {plate_name} placeholders for OCIO Write's
                 output_folder / filename, filled from the upstream OCIO Read at queue time.
@@ -131,9 +132,13 @@ class LTXPlateRestore:
 # aspect_ratio output validates against Gemini31FlashImage's aspect_ratio combo.
 GEMINI_31_ASPECT_RATIOS = ["1:1", "1:4", "4:1", "1:8", "8:1", "2:3", "3:2", "3:4", "4:3",
                            "4:5", "5:4", "9:16", "16:9", "21:9"]
+# ... and GEMINI_3_PRO_IMAGE_ASPECT_RATIO, for Gemini3ProImage (Nano Banana Pro).
+GEMINI_3_PRO_ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
 
 
 class PlateAspectPad:
+    RATIOS = GEMINI_31_ASPECT_RATIOS
+
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {"images": ("IMAGE",)}}
@@ -146,7 +151,7 @@ class PlateAspectPad:
     def run(self, images):
         h, w = images.shape[1], images.shape[2]
         best = None
-        for name in GEMINI_31_ASPECT_RATIOS:
+        for name in self.RATIOS:
             a, b = (int(v) for v in name.split(":"))
             # only ever pad (grow one axis), never crop the plate
             if a * h >= b * w:
@@ -164,10 +169,16 @@ class PlateAspectPad:
         return (x, name, pw, ph, info)
 
 
+class PlateAspectPadGeminiPro(PlateAspectPad):
+    RATIOS = GEMINI_3_PRO_ASPECT_RATIOS
+    RETURN_TYPES = ("IMAGE", GEMINI_3_PRO_ASPECT_RATIOS, "INT", "INT", "STRING")
+
+
 NODE_CLASS_MAPPINGS = {"LTXPlatePrep": LTXPlatePrep, "LTXPlateRestore": LTXPlateRestore,
-                       "PlateAspectPad": PlateAspectPad}
+                       "PlateAspectPad": PlateAspectPad, "PlateAspectPadGeminiPro": PlateAspectPadGeminiPro}
 NODE_DISPLAY_NAME_MAPPINGS = {"LTXPlatePrep": "LTX Plate Prep (local)",
                               "LTXPlateRestore": "LTX Plate Restore (local)",
-                              "PlateAspectPad": "Plate Aspect Pad (local)"}
+                              "PlateAspectPad": "Plate Aspect Pad (local)",
+                              "PlateAspectPadGeminiPro": "Plate Aspect Pad - Gemini Pro (local)"}
 
 WEB_DIRECTORY = "./web"

@@ -149,7 +149,7 @@
     {
       "name": "advanced",
       "label": "advanced",
-      "type": "divider"
+      "type": "group"
     },
     {
       "name": "negative_prompt",

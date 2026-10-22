@@ -1,0 +1,151 @@
+{
+  "id": "flux3_klein",
+  "label": "Flux 3 Klein Edit",
+  "description": "FLUX 3 Image Klein edit of one frame by a text prompt, with up to 3 reference images and 4 area boxes. Output: the edited frame at plate size.",
+  "api": "flux3_klein.api.json",
+  "suffix": "Flux3Klein",
+  "frames": "single",
+  "input_name": "plate",
+  "read": {
+    "node": "100"
+  },
+  "write": {
+    "node": "103"
+  },
+  "refs": [
+    {
+      "name": "ref2",
+      "targets": [
+        {
+          "node": "17",
+          "input": "images.image1"
+        },
+        {
+          "node": "50",
+          "input": "images.image1"
+        }
+      ]
+    },
+    {
+      "name": "ref3",
+      "targets": [
+        {
+          "node": "17",
+          "input": "images.image2"
+        },
+        {
+          "node": "50",
+          "input": "images.image2"
+        }
+      ]
+    },
+    {
+      "name": "ref4",
+      "targets": [
+        {
+          "node": "17",
+          "input": "images.image3"
+        },
+        {
+          "node": "50",
+          "input": "images.image3"
+        }
+      ]
+    }
+  ],
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "Flux works on display-referred (sRGB Texture) images, so values above 1.0 are clipped. Comp the edit back over the plate only where it changed."
+  },
+  "enhancer": {
+    "after": "refine_prompt",
+    "output_node": "52",
+    "force": [
+      {
+        "node": "51",
+        "input": "switch",
+        "value": false
+      }
+    ]
+  },
+  "boxes": {
+    "node": "55",
+    "count": 4,
+    "after": "refine_prompt"
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "49",
+      "input": "prompt",
+      "tooltip": "Describe the whole result with the edit folded in. The plate is <ref_image_0>, ref2-ref4 are <ref_image_1>-<ref_image_3>; box N is <obj_N>."
+    },
+    {
+      "name": "refine_prompt",
+      "label": "refine prompt",
+      "type": "bool",
+      "default": false,
+      "invert": true,
+      "node": "51",
+      "input": "switch",
+      "tooltip": "Let the Flux 3 prompt upsampler (sees the images) rewrite the prompt first. Slower, usually better."
+    },
+    {
+      "name": "megapixels",
+      "label": "megapixels",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.25,
+      "max": 16.0,
+      "node": "17",
+      "input": "resolution.megapixels",
+      "tooltip": "Working size of the plate and references (aspect kept). 1 = about 1 MP; more = more detail, slower. The result is scaled back to plate size."
+    },
+    {
+      "name": "steps",
+      "label": "steps",
+      "type": "int",
+      "default": 50,
+      "node": "7",
+      "input": "steps",
+      "tooltip": "Base: 50. Distilled: 4-16."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "node": "7",
+      "input": "seed"
+    },
+    {
+      "name": "cfg",
+      "label": "cfg",
+      "type": "float",
+      "default": 1.0,
+      "min": 1.0,
+      "max": 10.0,
+      "node": "7",
+      "input": "cfg"
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "58",
+      "input": "text",
+      "tooltip": "What to avoid. Only has an effect with cfg above 1."
+    }
+  ]
+}
