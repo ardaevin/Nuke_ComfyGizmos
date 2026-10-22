@@ -11,7 +11,7 @@ The node talks to ComfyUI's HTTP API directly. The Nuke side is pure Python
 
 | Node (Nodes > ComfyUI) | Does | Frames | Output |
 |---|---|---|---|
-| **LTX Alpha Gen** | Alpha matte from a plate (LTX-2.5 Alpha Gen IC-LoRA) | range, up to 145 | ACEScg-labelled matte |
+| **LTX Alpha Gen** | Alpha matte from a plate, or from a cropped area of it (LTX-2.5 Alpha Gen IC-LoRA) | range, up to 145 | ACEScg-labelled matte |
 | **LTX SDR to HDR** | SDR plate to scene-linear HDR (LTX-2.5 IC-LoRA) | range, up to 241 | ACES2065-1 |
 | **LTX SDR to HDR (Tiled)** | Same, two stages with a latent x2 upscale | range, up to 241 | ACES2065-1, upscaled |
 | **Qwen Image Edit** | Edits one frame from a text prompt, with up to 3 reference images (Qwen-Image 2.1) | single | ACES2065-1 |
@@ -77,9 +77,11 @@ scene embedding.
 
 ## Use
 
-Create the node from **Nodes > ComfyUI**, connect it, fill in **Name** if
-needed, and press **Render in ComfyUI**. The render runs in the background and
-**status** reports progress, so Nuke stays usable.
+Create the node from **Nodes > ComfyUI** (or Tab), fill in **Name** if
+needed, and press **Render in ComfyUI**. With a node selected, the gizmo is
+connected to it and inserted into the pipe below it, like any Nuke node. The
+render runs in the background and **status** reports progress, so Nuke stays
+usable.
 
 ### Inputs
 
@@ -125,8 +127,15 @@ The **source** and **output** versions are separate:
   To try again from the same source (a new seed, other settings), press
   **Version up output**. The source is reused and earlier outputs are kept.
   Rendering over an existing output version asks before overwriting.
-- The node's **label** shows the Name and the output version, e.g.
-  `WallFix` / `v003`.
+- The node's **label** shows the Name, the output version and the render
+  state, e.g. `WallFix` / `v003` / `done`. The node colour follows the state:
+
+  | State | Colour |
+  |---|---|
+  | `rendering`, `queued` (and `refining` for Run enhancer only) | yellow |
+  | `done` | green |
+  | `failed`, `cancelled` | red |
+  | not rendered yet, `refined` | the normal blue |
 
 Output frames keep the plate's frame numbers. The colorspace tag in the file
 name comes from OCIO Write.
@@ -153,17 +162,35 @@ name comes from OCIO Write.
   1.3 and 2.0 names, and nuke-default names, are matched to ComfyUI's config.
 - **output colorspace**: the written files' colorspace, which the node's Read
   also uses.
-- **Reload result**, **Cancel** and **Bring in output**, which puts a Read of
-  the result next to the node. LTX Alpha Gen also adds a Crop and a
-  red-to-alpha Shuffle; DSINE Normals adds its -1..1 decode. The node's own
-  Read skips Nuke's file localization, so re-rendering a version always shows
-  the new files.
+- **Reload result**, **Cancel** and **Bring in output**.
+  - **Bring in output** puts a Read of the result straight under the node,
+    with any extra nodes stacked below it.
+  - Single-frame results come in as a still of the actual file, so they show
+    on every frame.
+  - LTX Alpha Gen adds a Crop and a red-to-alpha Shuffle (see below), and
+    DSINE Normals adds its -1..1 decode.
+  - The node's own Read skips Nuke's file localization, so re-rendering a
+    version always shows the new files.
 
 ### Gizmo notes
 
-- **LTX Alpha Gen**: seed, work scale and LoRA strength. **output** is
-  `matte` (rgba = matte) or `input + matte alpha`. The matte is written
-  untouched and labelled ACEScg.
+- **LTX Alpha Gen**:
+  - Seed, work scale and LoRA strength. **output** is `matte` (rgba = matte)
+    or `input + matte alpha`. The matte is written untouched and labelled
+    ACEScg.
+  - **crop** (on) + **crop area**: only that area of the plate is sent, which
+    gives the model more resolution on the subject. The area starts as the
+    whole plate and follows the plate's resolution until you move it in the
+    viewer. **reformat** shows the cropped plate exactly as it's sent; the box
+    handles are hidden while it's on.
+  - With crop on, the input is always rendered to `sources/`, even from a
+    plain Read. The matte is written at crop size and shown back in the full
+    plate frame.
+  - Each source version keeps the area it was rendered with (a `.crop.json`
+    next to it). After moving the area, press **Version up source**.
+  - **Bring in output** builds Read → Crop → Undo crop → Shuffle (red → rgba).
+    The Undo crop puts a crop-size matte back at plate resolution and
+    position, like a manual "undo crop".
 - **LTX SDR to HDR (Tiled)**: seed and LoRA strength drive both stages. The
   output is at the upscaled size.
 - **Qwen Image Edit / Turbo**:
@@ -261,6 +288,7 @@ created nodes.
      `invert` flips the value sent, for switches that mean the opposite.
    - optional `boxes` ({`node`, `count`, `after`}): area boxes for a Create
      Bounding Boxes node, as on the Flux gizmos.
+   - optional `crop` ({`default`}): the source crop, as on LTX Alpha Gen.
    - optional `default_name`: the Name a new node starts with.
 5. Run `python install.py` and restart Nuke.
 

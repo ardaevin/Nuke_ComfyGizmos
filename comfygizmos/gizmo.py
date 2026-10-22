@@ -39,6 +39,8 @@ STATE_TILE = {
     "done": 0x52C468FF,                                                        # bright green
     "failed": 0x7A1F1FFF, "cancelled": 0x7A1F1FFF,                              # dark red
 }
+# Retired workflow id -> the one that replaced it (nodes in old scripts keep working).
+WORKFLOW_ALIASES = {"ltx_alpha_crop": "ltx_alpha"}     # the crop test became LTX Alpha Gen (2026-10-22)
 _jobs = {}   # node full name -> job dict, while a render is in flight
 
 
@@ -54,6 +56,9 @@ def workflows():
             wf = json.load(f)
         if os.path.isfile(os.path.join(WORKFLOW_DIR, wf["api"])):
             found[wf["id"]] = wf
+    for old, new in WORKFLOW_ALIASES.items():           # retired workflows: their nodes keep working
+        if new in found and old not in found:
+            found[old] = found[new]
     return found
 
 
@@ -76,6 +81,8 @@ def register_menu():
     """Nodes > ComfyUI > <one entry per workflow>."""
     menu = nuke.menu("Nodes").addMenu("ComfyUI")
     for wf_id, wf in sorted(workflows().items(), key=lambda kv: kv[1]["label"]):
+        if wf_id != wf["id"]:                            # an alias of a retired workflow: no menu entry
+            continue
         menu.addCommand(wf["label"], "comfygizmos.create({!r})".format(wf_id))
 
 

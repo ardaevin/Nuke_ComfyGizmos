@@ -1,24 +1,58 @@
 {
   "id": "ltx_alpha",
   "label": "LTX Alpha Gen",
-  "description": "LTX-2.5 IC-LoRA alpha matte from a plate. Output: matte at plate resolution and frame numbers.",
+  "description": "LTX-2.5 IC-LoRA alpha matte from a plate - or from a cropped area of it, for more model resolution on the subject. Output: matte at plate frame numbers, shown in the full plate frame.",
   "api": "ltx_alpha.api.json",
   "suffix": "LTXAlpha",
+  "crop": {
+    "default": true
+  },
   "max_frames": 145,
-  "max_frames_input": {"node": "9011", "input": "max_frames",
-                       "tooltip": "The model card says 145: above that RGB detail can leak into the matte. Check the result if you go higher."},
-
-  "read":  {"node": "9010"},
-  "write": {"node": "9014"},
-
-  "output": {"kind": "matte", "colorspace": "ACES - ACEScg", "convert": false},
-
+  "max_frames_input": {
+    "node": "9011",
+    "input": "max_frames",
+    "tooltip": "The model card says 145: above that RGB detail can leak into the matte. Check the result if you go higher."
+  },
+  "read": {
+    "node": "9010"
+  },
+  "write": {
+    "node": "9014"
+  },
+  "output": {
+    "kind": "matte",
+    "colorspace": "ACES - ACEScg",
+    "convert": false
+  },
   "knobs": [
-    {"name": "seed", "label": "seed", "type": "int", "node": "9017", "input": "noise_seed", "default": 42},
-    {"name": "work_scale", "label": "work scale", "type": "float", "node": "9011", "input": "scale",
-     "default": 0.5, "min": 0.1, "max": 1.0,
-     "tooltip": "Working size inside the 1920x1088 limit (1.0 = largest that fits). Lower = faster, softer matte."},
-    {"name": "lora_strength", "label": "LoRA strength", "type": "float", "node": "9055", "input": "strength_model",
-     "default": 1.0, "min": 0.0, "max": 2.0}
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "node": "9017",
+      "input": "noise_seed",
+      "default": 42
+    },
+    {
+      "name": "work_scale",
+      "label": "work scale",
+      "type": "float",
+      "node": "9011",
+      "input": "scale",
+      "default": 0.5,
+      "min": 0.1,
+      "max": 1.0,
+      "tooltip": "Working size inside the 1920x1088 limit (1.0 = largest that fits). Lower = faster, softer matte; with a small crop you can raise it."
+    },
+    {
+      "name": "lora_strength",
+      "label": "LoRA strength",
+      "type": "float",
+      "node": "9055",
+      "input": "strength_model",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0
+    }
   ]
 }
