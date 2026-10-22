@@ -17,7 +17,11 @@ The node talks to ComfyUI's HTTP API directly. The Nuke side is pure Python
 | **Qwen Image Edit** | Edits one frame from a text prompt, with up to 3 reference images (Qwen-Image 2.1) | single | ACES2065-1 |
 | **Qwen Image Edit (Turbo)** | Same, with the fixed 8-step Turbo model | single | ACES2065-1 |
 | **DSINE Normals** | Camera-space surface normals | single | raw EXR, decoded to -1..1 in the node |
+| **Flux 3 Klein Edit** | Edits one frame from a text prompt, with up to 3 reference images and 4 area boxes (FLUX 3 Image Klein, base model) | single | ACES2065-1 |
+| **Flux 3 Klein Edit (Distilled)** | Same, with the faster step-distilled model | single | ACES2065-1 |
 | **Nano Banana 2** | Edits one frame from a text prompt, with up to 5 reference images (Gemini 3.1 Flash Image on Google Vertex AI; paid per render) | single | ACES2065-1 |
+| **Nano Banana Pro** | Same, with Gemini 3 Pro Image (costs more per render) | single | ACES2065-1 |
+| **Gemini 3.1 Pro** | Answers a prompt about a frame, a frame range (sent as video) or nothing; text only, the plate passes through (Vertex AI; paid per run) | frame / range / none | text reply |
 
 ## Requirements
 
@@ -38,7 +42,9 @@ Per gizmo:
 | Qwen Image Edit | `ltx_plate_tools` | `diffusion_models/qwen_image_2.1_int8_convrot.safetensors`, `vae/qwen_image_2.1_vae_bf16.safetensors`, `text_encoders/qwen3vl_8b_int8_convrot.safetensors`, `text_encoders/qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors` (prompt enhancer) |
 | Qwen Image Edit (Turbo) | `ltx_plate_tools` | as above, with `diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors` |
 | DSINE Normals | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) | DSINE (downloaded by the pack on first use) |
-| Nano Banana 2 | [comfyui-google-genmedia-custom-nodes](https://github.com/GoogleCloudPlatform/comfyui-google-genmedia-custom-nodes), `ltx_plate_tools` | none local: it calls Vertex AI. You need a Google Cloud project with Vertex AI enabled, signed in with `gcloud auth application-default login` |
+| Flux 3 Klein Edit | `ltx_plate_tools` (the Flux nodes are part of ComfyUI) | `diffusion_models/flux3_image_klein_base_int8_convrot.safetensors`, `vae/flux2-vae.safetensors`, `text_encoders/qwen3vl_4b_int8_convrot.safetensors`, `text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors` (prompt upsampler), from [black-forest-labs/flux-3-image-klein-comfy](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy) |
+| Flux 3 Klein Edit (Distilled) | `ltx_plate_tools` | as above, with `diffusion_models/flux3_image_klein_sd_int8_convrot.safetensors` |
+| Nano Banana 2, Nano Banana Pro, Gemini 3.1 Pro | [comfyui-google-genmedia-custom-nodes](https://github.com/GoogleCloudPlatform/comfyui-google-genmedia-custom-nodes), `ltx_plate_tools` | none local: they call Vertex AI. You need a Google Cloud project with Vertex AI enabled, signed in with `gcloud auth application-default login` |
 
 The Lightricks repos on Hugging Face are gated, so accept the licence first.
 ComfyUI only lists `embeddings/` at startup, so restart it after adding the
@@ -77,8 +83,8 @@ needed, and press **Render in ComfyUI**. The render runs in the background and
 
 ### Inputs
 
-The **input** (or source) is whatever is connected to the gizmo. On the Qwen
-and Nano Banana gizmos the `ref` reference inputs count as inputs too.
+The **input** (or source) is whatever is connected to the gizmo. On the Qwen,
+Flux and Nano Banana gizmos the `ref` reference inputs count as inputs too.
 
 - **A plain Read**, connected straight in with no frame offset, is sent to
   ComfyUI as it is. Nothing is rendered.
@@ -90,7 +96,9 @@ and Nano Banana gizmos the `ref` reference inputs count as inputs too.
 **Name**, at the top, names everything the node writes. It's required unless
 the input is a plain Read; with a plain Read and Name left empty, the plate's
 file name is used. The gizmo name is fixed per gizmo: `LTXAlpha`, `LTXHDR`,
-`LTXHDRTiled`, `QwenEdit`, `QwenEditTurbo`, `DSINENormal` or `NanoBanana2`.
+`LTXHDRTiled`, `QwenEdit`, `QwenEditTurbo`, `Flux3Klein`, `Flux3KleinDistilled`,
+`DSINENormal`, `NanoBanana2`, `NanoBananaPro` or `Gemini31Pro`. Gemini 3.1 Pro starts with
+Name `Chat`, so it can run without anything typed.
 
 ### Folders and versions
 
@@ -131,13 +139,25 @@ name comes from OCIO Write.
 - **frame** + **Set to current frame** (single-frame gizmos): the frame to
   process. It doesn't follow the playhead. **hold on all frames** shows the
   result on every frame.
+- **seed** + **increment** (gizmos with a seed): with increment on (the
+  default), the seed goes up by 1 after each render is sent, as ComfyUI's
+  "increment" does, so every render is a new attempt. The seed a render used
+  is in its status line. Untick increment to keep a seed and reproduce a result.
+- **advanced** is a closed section on every gizmo. It holds **colorspace
+  override** and the workflow's less-used settings (negative prompt, top p /
+  top k, system instruction, GCP project). On gizmos with a prompt enhancer it
+  sits right under **refine prompt** and also holds **Run enhancer only**,
+  **Use refined prompt** and **refined prompt**.
 - **colorspace override**: leave it empty and the colorspace comes from the
   Read; a Read on `default` (or an OCIO role) counts as ACES2065-1. ACES 1.2,
   1.3 and 2.0 names, and nuke-default names, are matched to ComfyUI's config.
 - **output colorspace**: the written files' colorspace, which the node's Read
   also uses.
-- **Reload result**, **Bring in output** (a Read of the result next to the
-  node, then a Crop; plus a red-to-alpha Shuffle for mattes) and **Cancel**.
+- **Reload result**, **Cancel** and **Bring in output**, which puts a Read of
+  the result next to the node. LTX Alpha Gen also adds a Crop and a
+  red-to-alpha Shuffle; DSINE Normals adds its -1..1 decode. The node's own
+  Read skips Nuke's file localization, so re-rendering a version always shows
+  the new files.
 
 ### Gizmo notes
 
@@ -155,6 +175,20 @@ name comes from OCIO Write.
     **prompt** and turns refining off.
   - Qwen works on display-referred images, so values above 1.0 are clipped.
     Comp the edit back over the plate only where it changed.
+- **Flux 3 Klein Edit / Distilled**:
+  - **prompt** describes the whole result with the edit folded in. The plate
+    is `<ref_image_0>`, the refs are `<ref_image_1>`-`<ref_image_3>`, and box N
+    is `<obj_N>`. For example: `In <ref_image_0>, replace the jacket <obj_1>
+    with a navy wool overcoat; keep everything else the same.`
+  - **boxes** (closed section): up to 4, each switched on, given a short
+    **description** of what is in the box now (e.g. `jacket`), and dragged in
+    the viewer as **area**. They start in the four corners and are sent in
+    plate pixels.
+  - **refine prompt** runs Flux's prompt upsampler (off by default), with the
+    same enhancer buttons as Qwen. **megapixels** sets the working size (the
+    result is scaled back to plate size). Steps default to 50 on base and 16 on
+    distilled; base also has a **negative prompt** in advanced.
+  - The same display-referred caveat as Qwen applies.
 - **DSINE Normals**: fov, iterations and resolution. **output** is
   `normals -1..1` or `encoded 0..1`.
 - **Nano Banana 2**:
@@ -170,6 +204,18 @@ name comes from OCIO Write.
   - The plate is padded to the nearest aspect ratio Nano Banana supports, and
     the padding is cropped off afterwards. Values above 1.0 are clipped and the
     whole frame is regenerated, so comp the edit back only where it changed.
+- **Nano Banana Pro**: as Nano Banana 2, with Gemini 3 Pro Image; **image
+  size** is 1K, 2K or 4K.
+- **Gemini 3.1 Pro** (text, not images):
+  - **send**: `frame` (one frame, as PNG), `frame range as video` (the range as
+    an H.264 MP4, up to 600 frames) or `text only` (just the prompt).
+  - **model** (3.1 Pro, 3 Flash, 3.1 Flash Lite), **temperature** and **max
+    output tokens**; top p, top k, system instruction and GCP project are in
+    advanced.
+  - The answer appears in **reply** and is saved as
+    `outputs/<Name>_Gemini31Pro/<Name>_Gemini31Pro_v###.txt`. **Copy reply**
+    puts it on the clipboard; **Send to prompt below** writes it into the
+    prompt of every ComfyGizmo connected below this node.
 
 ### Local defaults
 
@@ -180,7 +226,11 @@ rather than in the repo:
 {
   "host": "http://127.0.0.1:8188",
   "output_subpath": "Comp/Inputs/ComfyUI",
-  "knob_defaults": {"nano_banana2": {"gcp_project": "your-gcp-project"}}
+  "knob_defaults": {
+    "nano_banana2": {"gcp_project": "your-gcp-project"},
+    "nano_banana_pro": {"gcp_project": "your-gcp-project"},
+    "gemini31_pro": {"gcp_project": "your-gcp-project"}
+  }
 }
 ```
 
@@ -207,7 +257,11 @@ created nodes.
      `float`, `bool`, `string`, `multiline` and `choice` (with `values`). Two
      types only lay out the panel: `divider` (a heading) and `group` (a closed
      section up to the next group). `env_fallback` names an environment
-     variable that is used when the knob is left empty.
+     variable that is used when the knob is left empty. On a `bool`,
+     `invert` flips the value sent, for switches that mean the opposite.
+   - optional `boxes` ({`node`, `count`, `after`}): area boxes for a Create
+     Bounding Boxes node, as on the Flux gizmos.
+   - optional `default_name`: the Name a new node starts with.
 5. Run `python install.py` and restart Nuke.
 
 ## Tests
@@ -220,6 +274,6 @@ because Nuke reads bare numbers as a frame range.
 - `nuke_test_naming.py`: Name, sources/outputs, and the source and output
   versions.
 - `nuke_test.py`, `nuke_test_workflow.py`, `nuke_test_qwen.py`,
-  `nuke_test_normals.py`: end-to-end per gizmo. Nano Banana 2 has no test,
-  because every run is a paid API call.
+  `nuke_test_normals.py`: end-to-end per gizmo. Nano Banana 2, Nano Banana Pro
+  and Gemini 3.1 Pro have no tests, because every run is a paid API call.
 - `test_colorspace.py`: colorspace name matching against the live ComfyUI.
