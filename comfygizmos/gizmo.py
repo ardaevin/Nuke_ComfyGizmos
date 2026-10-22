@@ -31,6 +31,14 @@ PROJECT_TOKEN = "[value root.project_directory]"
 # What a Read set to "default" (or to an OCIO role) means in our scripts.
 DEFAULT_COLORSPACE = "ACES - ACES2065-1"
 
+TILE_DEFAULT = 0x3F5F8AFF   # the gizmos' blue
+# Node colour by render state. Green and red also differ a lot in brightness (bright vs dark), so they stay
+# apart for red-green colour blindness too; the state word on the label says the same thing.
+STATE_TILE = {
+    "rendering": 0xD2B43CFF, "queued": 0xD2B43CFF, "refining": 0xD2B43CFF,   # yellow
+    "done": 0x52C468FF,                                                        # bright green
+    "failed": 0x7A1F1FFF, "cancelled": 0x7A1F1FFF,                              # dark red
+}
 _jobs = {}   # node full name -> job dict, while a render is in flight
 
 
@@ -75,14 +83,28 @@ def register_menu():
 
 def create(wf_id):
     wf = workflows()[wf_id]
+    # Like any Nuke node: connect to the selected node and take its place in the pipe. createNode can't do it
+    # here - the Group has no inputs yet when it is made - so remember the selection and wire up afterwards.
+    upstream = _single_selected()
+    up_name = upstream.fullName() if upstream is not None else None
+    downstream = [(n, i) for n in (upstream.dependent(nuke.INPUTS, forceEvaluate=False) if upstream else [])
+                  for i in range(n.inputs()) if n.input(i) is not None and n.input(i).fullName() == up_name]
     group = nuke.createNode("Group", inpanel=False)
     group.setName("Comfy_" + wf["suffix"])
-    group["tile_color"].setValue(0x3F5F8AFF)
+    group["tile_color"].setValue(TILE_DEFAULT)
     _build_internals(group, wf)
     _add_knobs(group, wf)
+    if upstream is not None:
+        group.setInput(0, upstream)
+        _place_below(group, upstream)
+        for node, i in downstream:                     # what read from the selected node now reads from the gizmo
+            src = node.input(i)
+            if node.fullName() != group.fullName() and src is not None and src.fullName() == up_name:
+                node.setInput(i, group)
     group["knobChanged"].setValue(
         "try:\n    import comfygizmos\n    comfygizmos.knob_changed(nuke.thisNode(), nuke.thisKnob())\n"
         "except ImportError:\n    pass\n")
+    _fit_crop_to_plate(group)
     _update_source_knobs(group)
     _update_send_knobs(group)
     _update_label(group)
@@ -90,15 +112,45 @@ def create(wf_id):
     return group
 
 
+def _place_below(node, upstream):
+    """Put a new gizmo under the node it reads from, as Nuke places nodes made with Tab."""
+    try:
+        nuke.autoplace(node)                           # Nuke's own placement, now that the input is connected
+        if node.ypos() > upstream.ypos():
+            return
+    except Exception:
+        pass
+    w = node.screenWidth() or 80
+    node.setXYpos(int(upstream.xpos() + (upstream.screenWidth() - w) / 2),
+                  int(upstream.ypos() + (upstream.screenHeight() or 18) + 30))
+
+
+def _single_selected():
+    """The one selected node to connect a new gizmo to, or None (nothing or several selected)."""
+    try:
+        sel = nuke.selectedNodes()
+    except Exception:
+        return None
+    if len(sel) != 1 or sel[0].maxOutputs() == 0:     # e.g. a Viewer or a Write has no output to feed us
+        return None
+    return sel[0]
+
+
 def knob_changed(group, knob):
     """Group callback: grey out the source version when a plain Read is connected; refresh the result view."""
     if knob.name() in ("inputChange", "showPanel", "cg_crop_on"):
         _restore_text_knobs(group)
+        _crops_without_black_edge(group)
+        _fit_crop_to_plate(group)
         _update_source_knobs(group)
         _update_label(group)
         _update_send_knobs(group)
     elif knob.name() in ("cg_name", "cg_version"):
         _update_label(group)
+    elif knob.name() == "cg_crop_preview":
+        _crop_handles(group)
+    elif knob.name() == "cg_crop_box" and not _fitting_crop:
+        group["cg_crop_auto"].setValue(False)          # moved by the user: stop following the plate
     elif knob.name() == "cg_send":
         _update_send_knobs(group)
     elif knob.name() in ("cg_hold", "cg_output") and group["cg_result"].value():
@@ -113,6 +165,7 @@ def _build_internals(group, wf):
         if wf.get("crop"):                               # the source can be cropped before it is rendered
             src_crop = nuke.nodes.Crop(name="SourceCrop", inputs=[inp], disable=True)
             src_crop["reformat"].setValue(True)          # the cropped area becomes the whole (smaller) frame
+            src_crop["crop"].setValue(False)             # no 'black outside': bbox = the box, no 1 px black edge
             _source_write("SourceWrite", src_crop)
         else:
             _source_write("SourceWrite", inp)
@@ -146,7 +199,18 @@ def _build_internals(group, wf):
         for i, node in enumerate(choices):
             switch.setInput(i, node)
         switch["which"].setValue(0)
-        nuke.nodes.Output(inputs=[switch])
+        if wf.get("crop"):
+            # 'reformat' on: show the plate cropped (live crop area) exactly as it would be sent
+            preview = nuke.nodes.Crop(name="CropPreview", inputs=[inp])
+            preview["reformat"].setValue(True)
+            preview["crop"].setValue(False)              # same as SourceCrop: bbox exactly the crop area
+            for i, ch in enumerate("xyrt"):
+                preview["box"].setExpression("parent.cg_crop_box.{}".format(ch), i)
+            show = nuke.nodes.Switch(name="CropPreviewSwitch", inputs=[switch, preview])
+            show["which"].setExpression("parent.cg_crop_preview && parent.cg_crop_on")
+            nuke.nodes.Output(inputs=[show])
+        else:
+            nuke.nodes.Output(inputs=[switch])
     finally:
         group.end()
 
@@ -231,11 +295,20 @@ def _add_knobs(group, wf):
                         "crop size and put back into the full plate frame here. The area is saved with the "
                         "source version: after moving it, press 'Version up source'.")
         k(c_on)
+        c_show = nuke.Boolean_Knob("cg_crop_preview", "reformat", False)
+        c_show.clearFlag(nuke.STARTLINE)
+        c_show.setTooltip("Show the plate cropped to 'crop area' and reformatted - exactly what is sent. "
+                          "Untick to see the result again.")
+        k(c_show)
         fmt = nuke.root().format()
         c_box = nuke.BBox_Knob("cg_crop_box", "crop area")
-        c_box.setValue([fmt.width() * 0.25, fmt.height() * 0.25, fmt.width() * 0.75, fmt.height() * 0.75])
-        c_box.setTooltip("Drag it in the viewer (panel open), in the plate's pixels.")
+        c_box.setValue([0, 0, fmt.width(), fmt.height()])
+        c_box.setTooltip("Starts as the whole plate and follows the plate's resolution until you change it. Drag "
+                         "it in the viewer (panel open), in the plate's pixels.")
         k(c_box)
+        c_auto = nuke.Boolean_Knob("cg_crop_auto", "cg_crop_auto", True)   # True until the user edits the box
+        c_auto.setFlag(nuke.INVISIBLE)
+        k(c_auto)
     if _has_send(wf):
         send = nuke.Enumeration_Knob("cg_send", "send", list(SEND_MODES))
         send.setFlag(nuke.STARTLINE)
@@ -585,6 +658,44 @@ def version_up_source(group):
         int(group["cg_src_version"].value())))
 
 
+_fitting_crop = False   # True while the crop area is set from the plate (not by the user)
+
+
+NO_HANDLES = 0x8000     # DDImage Knob::NO_HANDLES - no viewer handles for this knob (not exposed as nuke.*)
+
+
+def _crops_without_black_edge(group):
+    """Older nodes: their internal crops had 'black outside' on (bbox 1 px bigger, a black edge in the source)."""
+    for name in ("SourceCrop", "CropPreview"):
+        node = group.node(name)
+        if node is not None and node["crop"].value():
+            node["crop"].setValue(False)
+
+
+def _crop_handles(group):
+    """With 'reformat' on the viewer shows the cropped image, which starts at the crop's corner - the crop area
+    handles would be drawn in plate coordinates over it and look moved. Hide them then; the values don't change."""
+    if "cg_crop_box" not in group.knobs():
+        return
+    if "cg_crop_preview" in group.knobs() and group["cg_crop_preview"].value():
+        group["cg_crop_box"].setFlag(NO_HANDLES)
+    else:
+        group["cg_crop_box"].clearFlag(NO_HANDLES)
+
+
+def _fit_crop_to_plate(group):
+    """Crop area = the whole plate, until the user changes it."""
+    global _fitting_crop
+    if "cg_crop_auto" not in group.knobs() or not group["cg_crop_auto"].value() or group.input(0) is None:
+        return
+    fmt = group.input(0).format()
+    _fitting_crop = True
+    try:
+        group["cg_crop_box"].setValue([fmt.x(), fmt.y(), fmt.r(), fmt.t()])
+    finally:
+        _fitting_crop = False
+
+
 def _crop_on(group):
     return "cg_crop_on" in group.knobs() and bool(group["cg_crop_on"].value())
 
@@ -608,7 +719,25 @@ def _update_label(group):
     if not name:
         read = _direct_read(group)
         name = plate_name(_read_path(read)) if read is not None else ""
-    group["label"].setValue("{}\nv{:03d}".format(name, int(group["cg_version"].value())).lstrip("\n"))
+    state = group["cg_state"].value() if "cg_state" in group.knobs() else ""
+    label = "{}\nv{:03d}".format(name, int(group["cg_version"].value())).lstrip("\n")
+    group["label"].setValue(label + ("\n" + state if state else ""))
+
+
+def _set_state(group, state):
+    """One-word render state on the node's label: queued / rendering / done / failed / cancelled /
+    refining / refined. It stays until the next render."""
+    try:
+        if "cg_state" not in group.knobs():
+            knob = nuke.String_Knob("cg_state", "cg_state", "")
+            knob.setFlag(nuke.INVISIBLE)
+            group.addKnob(knob)
+        if group["cg_state"].value() != state:
+            group["cg_state"].setValue(state)
+            _update_label(group)
+            group["tile_color"].setValue(STATE_TILE.get(state, TILE_DEFAULT))
+    except Exception:
+        pass
 
 
 def _clean_name(text):
@@ -779,6 +908,7 @@ def _prepare(group, mode="render"):
         what = {"none": "text only", "frame": "frame {}".format(first),
                 "range": "frames {}-{} as video".format(first, last)}[send]
         _set_status(group, "queued - {}{}".format(what, " - " + "; ".join(notes) if notes else ""))
+        _set_state(group, "queued")
         return job
 
     enh = wf.get("enhancer")
@@ -792,6 +922,7 @@ def _prepare(group, mode="render"):
         _jobs[group.fullName()] = job
         group["cg_prompt_id"].setValue(prompt_id)
         _set_status(group, "prompt enhancer queued")
+        _set_state(group, "refining")
         return job
 
     # output naming = whatever OCIO Write will produce (<stem>_<tag>.####.exr)
@@ -814,6 +945,7 @@ def _prepare(group, mode="render"):
     _jobs[group.fullName()] = job
     group["cg_prompt_id"].setValue(prompt_id)
     what = "frame {}".format(first) if single else "{} frames".format(count)
+    _set_state(group, "queued")
     _set_status(group, "queued - {}, {}{}".format(what, os.path.basename(result),
                                                   " - " + "; ".join(notes) if notes else ""))
     return job
@@ -968,6 +1100,7 @@ def _prepare_source_crop(group, src_path, frame, crop_on):
     """Set the SourceCrop node for this source version; returns its crop 'x y r t W H' ('' = none).
     An existing source version keeps the area it was rendered with (its .crop.json), whatever the knob says."""
     node = group.node("SourceCrop")
+    node["crop"].setValue(False)                          # bbox exactly the box (older nodes had black outside on)
     plate = group.input(0)
     pw, ph = (plate.width(), plate.height()) if plate is not None else (nuke.root().width(), nuke.root().height())
     crop = ""
@@ -1024,6 +1157,7 @@ def _render_source(group, path, frames, write_name="SourceWrite"):
     write["disable"].setValue(False)
     try:
         _set_status(group, "rendering source {}...".format(os.path.basename(path)))
+        _set_state(group, "rendering")
         start = prev = frames[0]
         for f in frames[1:] + [None]:                # contiguous runs, so existing frames are left alone
             if f is not None and f == prev + 1:
@@ -1132,6 +1266,8 @@ def _poll(job, in_main=False):
             if state == "queued":
                 ui(_status_by_name, job, "queued (position {}) {}s".format(info, elapsed))
             elif state == "running":
+                if job.get("kind") != "enhance":
+                    ui(_state_by_name, job, "rendering")
                 ui(_status_by_name, job, "{} in ComfyUI... {}s".format(
                     "refining the prompt" if job.get("kind") == "enhance" else "rendering", elapsed))
             elif state == "done":
@@ -1149,6 +1285,12 @@ def _node(job):
     return nuke.toNode(job["group"])
 
 
+def _state_by_name(job, state):
+    node = _node(job)
+    if node is not None:
+        _set_state(node, state)
+
+
 def _status_by_name(job, text):
     node = _node(job)
     if node is not None:
@@ -1161,6 +1303,7 @@ def _finish(job, error, outputs=None):
         return
     if error:
         _set_status(node, "failed: " + error)
+        _set_state(node, "cancelled" if error == "cancelled" else "failed")
         nuke.tprint("[ComfyGizmos] {}: {}".format(node.name(), error))
         return
     if job.get("kind") == "text":
@@ -1176,6 +1319,7 @@ def _finish(job, error, outputs=None):
         _set_status(node, "reply ready in {}s{}".format(int(time.time() - job["started"]),
                                                         " - " + job["notes"] if job.get("notes") else "")
                     if reply else "finished, but Gemini returned no text (blocked or empty)")
+        _set_state(node, "done" if reply else "failed")
         return
     text = _output_text(outputs, job.get("enhancer_node"))
     if text and "cg_refined" in node.knobs():
@@ -1183,11 +1327,13 @@ def _finish(job, error, outputs=None):
     if job.get("kind") == "enhance":
         _set_status(node, "refined prompt ready in {}s - see 'refined prompt'".format(int(time.time() - job["started"]))
                     if text else "prompt enhancer finished but returned no text")
+        _set_state(node, "refined" if text else "failed")
         return
     missing = [f for f in range(job["first"], job["last"] + 1) if not os.path.isfile(job["result"] % f)]
     if missing:
         _set_status(node, "finished, but {} frame(s) are missing in {}".format(
             len(missing), os.path.dirname(job["result"])))
+        _set_state(node, "failed")
         return
     node["cg_result"].setValue(job["result"])
     node["cg_result_first"].setValue(str(job["first"]))
@@ -1196,6 +1342,7 @@ def _finish(job, error, outputs=None):
     if "cg_result_crop" in node.knobs():
         node["cg_result_crop"].setValue(job.get("crop", ""))
     got = load_result(node)
+    _set_state(node, "done")
     _set_status(node, "done in {}s - {} - frames {}-{}{}".format(
         int(time.time() - job["started"]), os.path.basename(job["result"]), got[0], got[1],
         " - " + job["notes"] if job.get("notes") else ""))
@@ -1366,6 +1513,26 @@ def _refresh_localization(read):
         nuke.tprint("[ComfyGizmos] localization update skipped: {}".format(e))
 
 
+def _node_size(node):
+    """(width, height) in the node graph; a fresh node may not be drawn yet, so fall back to typical sizes."""
+    w, h = node.screenWidth(), node.screenHeight()
+    if w <= 0:
+        w = 80
+    if h <= 0:
+        h = 78 if node.Class() == "Read" else 18       # a Read shows its thumbnail
+    return w, h
+
+
+def _stack_below(anchor, nodes, gap=30):
+    """Place nodes straight under anchor, centred, one under another - no overlaps."""
+    aw, ah = _node_size(anchor)
+    y = anchor.ypos() + ah + gap
+    for n in nodes:
+        w, h = _node_size(n)
+        n.setXYpos(int(anchor.xpos() + (aw - w) / 2), int(y))
+        y += h + gap
+
+
 def read_output(group):
     """Bring in output: a Read of the rendered EXRs next to this node. Mattes (LTX Alpha Gen) also get a Crop
     (to the plate's format) and a Shuffle (red -> alpha); normals an Expression (0-1 -> -1..1). Returns the Read."""
@@ -1380,29 +1547,39 @@ def read_output(group):
         for n in nuke.selectedNodes():
             n.setSelected(False)
         read = nuke.nodes.Read()
-        _point_read(read, path, first, last)
+        if _single(wf) and first == last:
+            # one frame: read the actual file as a still, so it shows on every frame (like a Read of that file)
+            read["file"].fromUserText(path % first)
+        else:
+            _point_read(read, path, first, last)
+            _apply_hold(group, read)
         _set_read_colorspace(read, _result_cs(group))
-        _apply_hold(group, read)
         read.setName("Read_" + re.sub(r"\W", "_", plate_name(path)))
         read.setXYpos(group.xpos() + 150, group.ypos())
         _refresh_localization(read)                  # keeps your localization policy, but never a stale copy
         last = read
         crop_info = _knob_value(group["cg_result_crop"]) if "cg_result_crop" in group.knobs() else ""
-        if crop_info:                                      # crop-size result: put it back into the plate frame
-            ref = nuke.nodes.Reformat(inputs=[read])
-            ref["type"].setValue("to box")
-            ref["box_fixed"].setValue(True)
-            ref["resize"].setValue("none")
-            ref["center"].setValue(False)
-            ref["black_outside"].setValue(True)
-            ref.setXYpos(read.xpos(), read.ypos() + 120)
-            move = nuke.nodes.Transform(inputs=[ref])
-            move.setXYpos(read.xpos(), ref.ypos() + 40)
-            set_uncrop(ref, move, crop_info)
-            move["label"].setValue("back into the plate")
-            last = move
-        if wf.get("output", {}).get("kind") == "matte":     # LTX Alpha Gen: Read -> Crop -> Shuffle
+        if crop_info and wf.get("output", {}).get("kind") == "matte":
+            # crop-size matte: Read -> Crop -> Undo crop (back to the plate, as undoCrop.py does) -> Shuffle
+            x, y, _r, _t, pw, ph = [float(v) for v in crop_info.split()]
+            crop = nuke.nodes.Crop(inputs=[read])
+            crop["box"].setValue([0, 0, read.width(), read.height()])
+            crop["crop"].setValue(True)                    # black outside (set explicitly: knob defaults may differ)
+            crop.setXYpos(read.xpos(), read.ypos() + 120)
+            undo = nuke.nodes.Crop(inputs=[crop])
+            undo["reformat"].setValue(True)
+            undo["crop"].setValue(False)
+            undo["box"].setValue([-x, -y, -x + pw, -y + ph])
+            undo["label"].setValue("Undo crop")
+            undo.setXYpos(read.xpos(), crop.ypos() + 50)
+            last = nuke.nodes.Shuffle2(inputs=[undo])
+            last["mappings"].setValue([(0, "rgba.red", "rgba.red"), (0, "rgba.red", "rgba.green"),
+                                       (0, "rgba.red", "rgba.blue"), (0, "rgba.red", "rgba.alpha")])
+            last["label"].setValue("red -> rgba")
+            last.setXYpos(read.xpos(), undo.ypos() + 50)
+        elif wf.get("output", {}).get("kind") == "matte":   # LTX Alpha Gen: Read -> Crop -> Shuffle
             crop = nuke.nodes.Crop(inputs=[last])
+            crop["crop"].setValue(True)                    # black outside (set explicitly: knob defaults may differ)
             if crop_info:
                 _x, _y, _r, _t, pw, ph = [float(v) for v in crop_info.split()]
                 crop["box"].setValue([0, 0, pw, ph])
@@ -1417,6 +1594,10 @@ def read_output(group):
         elif wf.get("output", {}).get("kind") == "normals":  # DSINE: Read -> decode
             last = _decode_normals(read)
             last.setXYpos(read.xpos(), read.ypos() + 120)
+        chain = [last]                                    # Read ... last, top to bottom
+        while chain[0].fullName() != read.fullName() and chain[0].input(0) is not None:
+            chain.insert(0, chain[0].input(0))
+        _stack_below(group, chain)
         last.setSelected(True)
     return read
 
@@ -1429,6 +1610,7 @@ def cancel(group):
     try:
         client.cancel(group["cg_host"].value().strip() or client.DEFAULT_HOST, prompt_id)
         _set_status(group, "cancelled")
+        _set_state(group, "cancelled")
     except client.ComfyError as e:
         _set_status(group, "cancel failed: {}".format(e))
 
