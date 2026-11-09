@@ -1,4 +1,4 @@
-"""Helpers for running LTX IC-LoRAs on VFX plates (part of ComfyGizmos).
+"""Local helpers (not a published pack) for running LTX IC-LoRAs on VFX plates.
 
 Plate Prep    : fit a plate inside the model's max size (aspect kept, never upscaled), edge-pad
                 (not stretch) to multiples of 32, and pad the frame count to 8n+1 by holding
@@ -10,6 +10,7 @@ Plate Aspect Pad : for models with a fixed aspect-ratio list (Gemini / Nano Bana
                 plate (right / bottom, edge-replicate) up to the nearest listed ratio and hand that
                 ratio to the model, so Plate Restore crops the pad off instead of stretching.
                 The "- Gemini Pro" variant uses Gemini 3 Pro Image's (Nano Banana Pro) shorter list.
+Veo Video Frames : every frame of a Veo clip (VEO_VIDEO paths) as an IMAGE batch, for OCIO Write.
 
 web/plate_path_tokens.js : {plate_dir} / {plate_name} placeholders for OCIO Write's
                 output_folder / filename, filled from the upstream OCIO Read at queue time.
@@ -174,11 +175,50 @@ class PlateAspectPadGeminiPro(PlateAspectPad):
     RETURN_TYPES = ("IMAGE", GEMINI_3_PRO_ASPECT_RATIOS, "INT", "INT", "STRING")
 
 
+class VeoVideoFrames:
+    """Google GenMedia's Veo nodes return file paths (VEO_VIDEO); its own converter samples at most 120 frames.
+    This reads every frame of one clip (0-1 sRGB, as decoded) plus its fps."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"video_paths": ("VEO_VIDEO",)},
+                "optional": {"index": ("INT", {"default": 0, "min": 0, "max": 3,
+                                               "tooltip": "Which clip, when Veo returned several."})}}
+
+    RETURN_TYPES = ("IMAGE", "FLOAT")
+    RETURN_NAMES = ("frames", "fps")
+    FUNCTION = "run"
+    CATEGORY = "image/LTX plate"
+
+    def run(self, video_paths, index=0):
+        import os
+        import cv2
+        import numpy as np
+        paths = [p for p in (video_paths or []) if p and os.path.isfile(p)]
+        if not paths:
+            raise RuntimeError("Veo returned no video file (blocked by a safety filter, or the call failed) - "
+                               "see the ComfyUI console")
+        cap = cv2.VideoCapture(paths[min(index, len(paths) - 1)])
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 24.0)
+        frames = []
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        cap.release()
+        if not frames:
+            raise RuntimeError("could not read any frame from " + paths[0])
+        return (torch.from_numpy(np.stack(frames)).float() / 255.0, fps)
+
+
 NODE_CLASS_MAPPINGS = {"LTXPlatePrep": LTXPlatePrep, "LTXPlateRestore": LTXPlateRestore,
-                       "PlateAspectPad": PlateAspectPad, "PlateAspectPadGeminiPro": PlateAspectPadGeminiPro}
+                       "PlateAspectPad": PlateAspectPad, "PlateAspectPadGeminiPro": PlateAspectPadGeminiPro,
+                       "VeoVideoFrames": VeoVideoFrames}
 NODE_DISPLAY_NAME_MAPPINGS = {"LTXPlatePrep": "LTX Plate Prep (local)",
                               "LTXPlateRestore": "LTX Plate Restore (local)",
                               "PlateAspectPad": "Plate Aspect Pad (local)",
-                              "PlateAspectPadGeminiPro": "Plate Aspect Pad - Gemini Pro (local)"}
+                              "PlateAspectPadGeminiPro": "Plate Aspect Pad - Gemini Pro (local)",
+                              "VeoVideoFrames": "Veo Video Frames (local)"}
 
 WEB_DIRECTORY = "./web"

@@ -2,6 +2,15 @@
   "id": "qwen_edit",
   "label": "Qwen Image Edit",
   "description": "Qwen-Image 2.1 edit of one frame by a text prompt, with up to 3 reference images. Output: the edited frame at plate size.",
+  "usage": [
+    "Edits one frame from a text prompt (Qwen Image 2.1), with up to 3 reference images.",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "The plate is <image1>, ref2-ref4 are <image2>-<image4>. Keep 'consistency LoRA' on unless the edit needs big moves or large removals.",
+    "Crop: tick 'crop' and move the box in the viewer to send only that area (more detail on small fixes).",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): Qwen Research License - research or evaluation only. Paid work needs a separate license from Qwen."
+  ],
   "api": "qwen_edit.api.json",
   "suffix": "QwenEdit",
   "frames": "single",
@@ -11,6 +20,9 @@
   },
   "write": {
     "node": "503"
+  },
+  "crop": {
+    "default": false
   },
   "refs": [
     {
@@ -57,11 +69,14 @@
     "kind": "image",
     "colorspace": "ACES - ACES2065-1",
     "convert": true,
-    "tooltip": "Qwen works on display-referred (sRGB Texture) images, so values above 1.0 are clipped. Comp the edit back over the plate only where it changed."
+    "tooltip": "Qwen works on display-referred images, so highlights are rolled off or clipped (see the highlights knob). Comp the edit back over the plate only where it changed."
   },
   "enhancer": {
     "after": "refine_prompt",
     "output_node": "459:480",
+    "nodes": [
+      "459:500"
+    ],
     "force": [
       {
         "node": "459:484",
@@ -154,6 +169,40 @@
       "node": "459:458",
       "input": "cfg",
       "tooltip": "Keep 1 (official). Raise it only together with a negative prompt."
+    },
+    {
+      "name": "consistency",
+      "label": "consistency LoRA",
+      "type": "bool",
+      "default": true,
+      "node": "459:521",
+      "input": "switch",
+      "tooltip": "Qwen Image 2.1 Consistency LoRA (ausboss): keeps the edit on the plate's framing - no drift in scale or position, untouched areas stay untouched. It can resist big moves (a new pose) and leave a faint ghost after large removals - turn it off for those."
+    },
+    {
+      "name": "highlights",
+      "label": "highlights",
+      "type": "choice",
+      "values": [
+        "Utility - sRGB - Texture",
+        "Output - sRGB"
+      ],
+      "labels": [
+        "clip",
+        "roll off"
+      ],
+      "default": "Output - sRGB",
+      "targets": [
+        {
+          "node": "504",
+          "input": "output_colorspace"
+        },
+        {
+          "node": "503",
+          "input": "from_colorspace"
+        }
+      ],
+      "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."
     },
     {
       "name": "advanced",

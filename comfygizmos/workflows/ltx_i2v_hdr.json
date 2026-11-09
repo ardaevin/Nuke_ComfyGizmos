@@ -1,0 +1,180 @@
+{
+  "id": "ltx_i2v_hdr",
+  "label": "LTX 2.5 I2V HDR",
+  "description": "LTX-2.5 Native HDR image to video: a new HDR clip from one HDR still and an optional prompt. Output: an EXR sequence in ACES2065-1 at its own size, numbered from the chosen frame, no audio.",
+  "usage": [
+    "Makes a new HDR clip from one frame of the input (LTX-2.5 Native HDR, two stages).",
+    "The input must already be real HDR, as it isn't upgraded from SDR. For an SDR plate use LTX SDR to HDR.",
+    "'Set to current frame' picks the frame. The output starts at that frame.",
+    "prompt is optional and describes the motion. 'long edge' is the final size, with the input's aspect.",
+    "'image strength' 1.0 locks the first frame to the still. Keep 'refine prompt' off when matching a plate.",
+    "License (checked 2026-11): LTX-2.x Community - commercial use is free under $10M annual revenue (affiliates count); above that needs a paid license. Generated content must be disclosed as machine-generated when distributed."
+  ],
+  "api": "ltx_i2v_hdr.api.json",
+  "suffix": "LTXI2VHDR",
+  "frames": "single",
+  "read": {
+    "node": "5601"
+  },
+  "write": {
+    "node": "5602"
+  },
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "LTX makes a new clip at its own size, not the plate's."
+  },
+  "size": {
+    "long_edge_knob": "long_edge",
+    "output_scale": 2,
+    "multiple": 32,
+    "width": [
+      {
+        "node": "5514:3059",
+        "input": "width"
+      }
+    ],
+    "height": [
+      {
+        "node": "5514:3059",
+        "input": "height"
+      }
+    ]
+  },
+  "generated_frames": {
+    "knob": "frames",
+    "round_down_step": 8,
+    "seconds": [
+      {
+        "node": "5512",
+        "input": "value"
+      }
+    ],
+    "script_fps": [
+      {
+        "node": "5511",
+        "input": "value"
+      }
+    ]
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "5508",
+      "input": "value",
+      "tooltip": "Optional: the motion and what happens in the clip. Your still supplies the scene."
+    },
+    {
+      "name": "frames",
+      "label": "frames",
+      "type": "int",
+      "default": 121,
+      "tooltip": "Clip length, rounded down to the 8n+1 count the model needs (9, 17, ... 121). It plays at the script's fps. More frames need more VRAM and time."
+    },
+    {
+      "name": "long_edge",
+      "label": "long edge",
+      "type": "int",
+      "default": 1920,
+      "tooltip": "Long edge of the final output, with the input's aspect. Stage 1 renders at half this and stage 2 doubles it; stage 1 snaps to a multiple of 32, so a 16:9 input at 1920 gives 1920x1088."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "5516:4832",
+          "input": "noise_seed"
+        },
+        {
+          "node": "5517:4967",
+          "input": "noise_seed"
+        },
+        {
+          "node": "5014:5546",
+          "input": "sampling_mode.seed"
+        }
+      ]
+    },
+    {
+      "name": "refine_prompt",
+      "label": "refine prompt",
+      "type": "bool",
+      "default": false,
+      "node": "5014:5556",
+      "input": "switch",
+      "tooltip": "Let the local Gemma enhancer (sees the still) rewrite the prompt first. Slower. Lightricks recommends off when matching a plate."
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "5509",
+      "input": "value"
+    },
+    {
+      "name": "image_strength",
+      "label": "image strength",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1.0,
+      "targets": [
+        {
+          "node": "5514:3159",
+          "input": "strength"
+        },
+        {
+          "node": "5517:4970",
+          "input": "strength"
+        }
+      ],
+      "tooltip": "How firmly the first frame follows your still, in both stages. 1.0 = locked."
+    },
+    {
+      "name": "cfg",
+      "label": "cfg",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 5.0,
+      "targets": [
+        {
+          "node": "5516:4828",
+          "input": "cfg"
+        },
+        {
+          "node": "5517:4964",
+          "input": "cfg"
+        }
+      ],
+      "tooltip": "Both stages. The workflow advises staying close to 1."
+    }
+  ],
+  "enhancer": {
+    "after": "refine_prompt",
+    "output_node": "5544",
+    "nodes": [
+      "5014:5546"
+    ],
+    "force": [
+      {
+        "node": "5014:5556",
+        "input": "switch",
+        "value": true
+      }
+    ]
+  }
+}

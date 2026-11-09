@@ -1,0 +1,59 @@
+{
+  "id": "vda_depth",
+  "label": "VDA Depth",
+  "description": "Video Depth Anything Large: temporally consistent relative depth for a frame range. Output: raw 32-bit EXR at plate size and plate frame numbers.",
+  "usage": [
+    "Makes a depth pass for a frame range (Video Depth Anything Large).",
+    "Whole input range is sent; tick 'input range' to send only first-last. Desqueeze anamorphic plates first.",
+    "Result is relative inverse depth: white = near, black = far. It isn't metric.",
+    "0-1 is normalised over the frames sent, so two different ranges don't match each other. Render the whole shot in one go.",
+    "'input size' is the short side the model sees: higher = more detail, much more VRAM. Lower it first if you run out of memory.",
+    "highlights: what the model sees. 'clip' (default) cuts at 1 and keeps shadows open. 'roll off' compresses highlights but crushes deep shadows.",
+    "License (checked 2026-11): VDA Large weights are CC-BY-NC-4.0 - non-commercial only. Paid work needs another model, such as VDA Small (Apache-2.0)."
+  ],
+  "api": "vda_depth.api.json",
+  "suffix": "VDADepth",
+  "input_name": "plate",
+  "max_frames": 300,
+  "read": {
+    "node": "1"
+  },
+  "write": {
+    "node": "6"
+  },
+  "output": {
+    "kind": "image",
+    "raw": true,
+    "tooltip": "Depth is data, not colour: written and read as raw, in all three channels."
+  },
+  "knobs": [
+    {
+      "name": "input_size",
+      "label": "input size",
+      "type": "int",
+      "node": "4",
+      "input": "input_size",
+      "default": 518,
+      "tooltip": "Short side the model sees (snapped to a multiple of 14). The result is scaled back to plate size. Plates wider than 16:9 get a smaller size automatically."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Utility - sRGB - Texture", "targets": [{"node": "1", "input": "output_colorspace"}], "tooltip": "What the model sees; only the input changes, as depth is data and isn't converted back. clip (default): values above 1 become 1 (colorimetric), shadows stay open. roll off: the plate goes in through ACES Output - sRGB, so highlights are compressed instead of cut, but deep shadows are crushed. Clip keeps shadow separation, which matters here because the node has an 8-bit step."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "precision",
+      "label": "precision",
+      "type": "choice",
+      "values": [
+        "fp16",
+        "fp32"
+      ],
+      "default": "fp16",
+      "node": "4",
+      "input": "precision",
+      "tooltip": "fp32 uses more VRAM and runs slower."
+    }
+  ]
+}

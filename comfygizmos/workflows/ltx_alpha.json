@@ -2,10 +2,19 @@
   "id": "ltx_alpha",
   "label": "LTX Alpha Gen",
   "description": "LTX-2.5 IC-LoRA alpha matte from a plate - or from a cropped area of it, for more model resolution on the subject. Output: matte at plate frame numbers, shown in the full plate frame.",
+  "usage": [
+    "Makes an alpha matte for a frame range (LTX-2.5 Alpha Gen).",
+    "Whole input range is sent; tick 'input range' to send only first-last.",
+    "Crop: tick 'crop' and move the box in the viewer to send only that area (more detail on small fixes).",
+    "output: the matte, or the input with the matte as alpha. Lower 'work scale' for long or big plates.",
+    "Bring in output builds Read > Crop (> Undo crop) > Shuffle.",
+    "highlights: what the model sees. 'clip' (default) cuts at 1 and keeps shadows open. 'roll off' compresses highlights but crushes deep shadows.",
+    "License (checked 2026-11): LTX-2.x Community - commercial use is free under $10M annual revenue (affiliates count); above that needs a paid license. Generated content must be disclosed as machine-generated when distributed."
+  ],
   "api": "ltx_alpha.api.json",
   "suffix": "LTXAlpha",
   "crop": {
-    "default": true
+    "default": false
   },
   "max_frames": 145,
   "max_frames_input": {
@@ -39,7 +48,7 @@
       "type": "float",
       "node": "9011",
       "input": "scale",
-      "default": 0.5,
+      "default": 1.0,
       "min": 0.1,
       "max": 1.0,
       "tooltip": "Working size inside the 1920x1088 limit (1.0 = largest that fits). Lower = faster, softer matte; with a small crop you can raise it."
@@ -53,6 +62,7 @@
       "default": 1.0,
       "min": 0.0,
       "max": 2.0
-    }
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Utility - sRGB - Texture", "targets": [{"node": "9010", "input": "output_colorspace"}], "tooltip": "What the model sees; only the input changes, as the matte is data and isn't converted back. clip (default): values above 1 become 1 (colorimetric), shadows stay open. roll off: the plate goes in through ACES Output - sRGB, so highlights are compressed instead of cut, but deep shadows are crushed. Try roll off for edges against blown-out backgrounds, such as hair against sky; keep clip for dark edges on dark backgrounds."}
   ]
 }

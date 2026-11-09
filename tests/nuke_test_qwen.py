@@ -62,7 +62,7 @@ comfygizmos.set_frame(g)
 check(int(g["cg_frame"].value()) == frame + 3, "Set to current frame picks up the playhead")
 g["cg_frame"].setValue(frame)
 nuke.frame(frame + 2)                       # playhead elsewhere at render time - must still edit 'frame'
-check("cg_input_range" not in g.knobs() and "cg_max_frames" not in g.knobs(), "no range / max frames knobs")
+check("cg_range_on" not in g.knobs() and "cg_max_frames" not in g.knobs(), "no range / max frames knobs")
 check(not g["wf_refine_prompt"].value(), "refine prompt off by default")
 
 g["wf_prompt"].setValue("Make the plain background wall behind the man a bright blue.")

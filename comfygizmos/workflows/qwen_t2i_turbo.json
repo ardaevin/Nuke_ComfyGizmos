@@ -1,0 +1,160 @@
+{
+  "id": "qwen_t2i_turbo",
+  "label": "Qwen Text to Image (Turbo)",
+  "description": "Qwen-Image 2.1 Turbo makes a new image from a text prompt (fixed fast schedule). No inputs. Output: an EXR in ACES2065-1 at the size you set.",
+  "usage": [
+    "Makes a new image from the prompt, faster than the standard version (Qwen-Image 2.1 Turbo, local, fixed 8 steps). It has no inputs.",
+    "'width' and 'height' set the size. Native is up to 2048x2048. Use multiples of 32.",
+    "highlights: 'roll off' (default) brings the result back through the inverse of ACES Output - sRGB, so near-whites come back hot (display 0.98 = about 7, 1.0 = about 16). 'clip' reads it as plain sRGB, so whites stay at 1.",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "License (checked 2026-11): Qwen Research License - research or evaluation only. Paid work needs a separate license from Qwen."
+  ],
+  "api": "qwen_t2i_turbo.api.json",
+  "suffix": "QwenT2ITurbo",
+  "frames": "single",
+  "no_input": true,
+  "write": {
+    "node": "461"
+  },
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "Qwen makes a display-referred image; 'highlights' sets how it comes back to scene-linear."
+  },
+  "enhancer": {
+    "after": "refine_prompt",
+    "output_node": "459:472",
+    "nodes": [
+      "459:471"
+    ],
+    "force": [
+      {
+        "node": "459:474",
+        "input": "switch",
+        "value": true
+      },
+      {
+        "node": "459:471",
+        "input": "thinking",
+        "value": true
+      }
+    ]
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "targets": [
+        {
+          "node": "459:474",
+          "input": "on_false"
+        },
+        {
+          "node": "459:471",
+          "input": "prompt"
+        }
+      ],
+      "tooltip": "What to generate."
+    },
+    {
+      "name": "refine_prompt",
+      "label": "refine prompt",
+      "type": "bool",
+      "default": false,
+      "targets": [
+        {
+          "node": "459:474",
+          "input": "switch"
+        },
+        {
+          "node": "459:471",
+          "input": "thinking"
+        }
+      ],
+      "tooltip": "Let the Qwen prompt enhancer rewrite the prompt first (slower, usually better). Turns its thinking mode on too."
+    },
+    {
+      "name": "width",
+      "label": "width",
+      "type": "int",
+      "default": 2048,
+      "node": "459:456",
+      "input": "width",
+      "tooltip": "Native is up to 2048. Use a multiple of 32."
+    },
+    {
+      "name": "height",
+      "label": "height",
+      "type": "int",
+      "default": 1152,
+      "node": "459:456",
+      "input": "height",
+      "tooltip": "Native is up to 2048. Use a multiple of 32."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "459:488",
+          "input": "noise_seed"
+        },
+        {
+          "node": "459:471",
+          "input": "sampling_mode.seed"
+        }
+      ]
+    },
+    {
+      "name": "cfg",
+      "label": "cfg",
+      "type": "float",
+      "default": 1.0,
+      "min": 1.0,
+      "max": 10.0,
+      "node": "459:489",
+      "input": "cfg",
+      "tooltip": "Keep 1 (official). Raise it only together with a negative prompt."
+    },
+    {
+      "name": "highlights",
+      "label": "highlights",
+      "type": "choice",
+      "values": [
+        "Utility - sRGB - Texture",
+        "Output - sRGB"
+      ],
+      "labels": [
+        "clip",
+        "roll off"
+      ],
+      "default": "Output - sRGB",
+      "targets": [
+        {
+          "node": "461",
+          "input": "from_colorspace"
+        }
+      ],
+      "tooltip": "How the result comes back; nothing goes in. roll off (default): through the inverse of ACES Output - sRGB, so bright areas come back above 1 and near-whites come back hot (display 0.98 = about 7, 1.0 = about 16). clip: read as plain sRGB (colorimetric), so whites stay at 1."
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "459:452",
+      "input": "negative_prompt",
+      "tooltip": "Only used when cfg is above 1."
+    }
+  ]
+}

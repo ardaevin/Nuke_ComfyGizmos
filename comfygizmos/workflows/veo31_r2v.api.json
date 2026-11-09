@@ -1,0 +1,93 @@
+{
+  "100": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "single",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {
+      "title": "Source Plate - OCIO Read (one frame: EXR / PNG / seq frame) [single frame]"
+    }
+  },
+  "2": {
+    "class_type": "Veo3ReferenceToVideo",
+    "inputs": {
+      "model": "VEO_3_1",
+      "image_format": "PNG",
+      "prompt": "",
+      "aspect_ratio": "16:9",
+      "output_resolution": "1080p",
+      "compression_quality": "optimized",
+      "person_generation": "allow_adult",
+      "duration_seconds": 8,
+      "generate_audio": false,
+      "sample_count": 1,
+      "output_gcs_uri": "",
+      "negative_prompt": "",
+      "seed": 0,
+      "gcp_project_id": "",
+      "gcp_region": "us-central1",
+      "image1": [
+        "100",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Veo3ReferenceToVideo"
+    }
+  },
+  "11": {
+    "class_type": "VeoVideoFrames",
+    "inputs": {
+      "video_paths": [
+        "2",
+        0
+      ],
+      "index": 0
+    },
+    "_meta": {
+      "title": "Veo Video Frames (local)"
+    }
+  },
+  "103": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "16f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": false,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 24,
+      "render_nonce": "",
+      "images": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {
+      "title": "Edit Write - ACES2065-1 EXR (named after the plate frame)"
+    }
+  }
+}

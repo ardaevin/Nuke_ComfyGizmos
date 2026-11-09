@@ -40,7 +40,7 @@ for n in nuke.allNodes():
 read.setSelected(True)
 g = comfygizmos.create(wf_id)
 g.setInput(0, read)
-g["cg_input_range"].setValue(True)
+g["cg_range_on"].setValue(False)          # whole input range
 
 # non-default knob values, to see them arrive in ComfyUI
 sent = {}

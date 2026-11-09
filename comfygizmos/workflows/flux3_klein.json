@@ -2,6 +2,15 @@
   "id": "flux3_klein",
   "label": "Flux 3 Klein Edit",
   "description": "FLUX 3 Image Klein edit of one frame by a text prompt, with up to 3 reference images and 4 area boxes. Output: the edited frame at plate size.",
+  "usage": [
+    "Edits one frame from a text prompt (Flux 3 Klein), with up to 3 reference images.",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "The plate is image 1, ref2-ref4 are images 2-4. Draw the area boxes in the viewer to point at regions.",
+    "refine prompt = let the enhancer rewrite the prompt first (Run enhancer only to preview it).",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): FLUX Kommunity v1.0 - commercial outputs are free under $5M annual revenue (affiliates count); above that needs a Black Forest Labs license. Outputs can't be used to improve a competing model. Fine-tuning and distribution aren't blanket-allowed."
+  ],
   "api": "flux3_klein.api.json",
   "suffix": "Flux3Klein",
   "frames": "single",
@@ -57,11 +66,11 @@
     "kind": "image",
     "colorspace": "ACES - ACES2065-1",
     "convert": true,
-    "tooltip": "Flux works on display-referred (sRGB Texture) images, so values above 1.0 are clipped. Comp the edit back over the plate only where it changed."
+    "tooltip": "Flux works on display-referred images, so highlights are rolled off or clipped (see the highlights knob). Comp the edit back over the plate only where it changed."
   },
   "enhancer": {
     "after": "refine_prompt",
-    "output_node": "52",
+    "output_node": "52", "nodes": ["47"],
     "force": [
       {
         "node": "51",
@@ -133,6 +142,7 @@
       "node": "7",
       "input": "cfg"
     },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "100", "input": "output_colorspace"}, {"node": "103", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
     {
       "name": "advanced",
       "label": "advanced",

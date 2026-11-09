@@ -188,7 +188,7 @@
       "device": "auto",
       "dtype": "default",
       "model": [
-        "459:451",
+        "459:521",
         0
       ]
     },
@@ -388,6 +388,37 @@
     "class_type": "CFGGuider",
     "_meta": {
       "title": "CFG Guider"
+    }
+  },
+  "459:520": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "lora_name": "qwen-image-2.1-consistency.safetensors",
+      "strength_model": 1.0,
+      "model": [
+        "459:451",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Consistency LoRA"
+    }
+  },
+  "459:521": {
+    "class_type": "ComfySwitchNode",
+    "inputs": {
+      "switch": true,
+      "on_true": [
+        "459:520",
+        0
+      ],
+      "on_false": [
+        "459:451",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Consistency LoRA on/off"
     }
   }
 }

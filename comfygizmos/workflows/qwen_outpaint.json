@@ -1,0 +1,101 @@
+{
+  "id": "qwen_outpaint",
+  "label": "Qwen Outpaint",
+  "description": "Qwen-Image 2.1 + the Outpaint LoRA (ausboss, v2) extends the frame: the plate is padded with flat gray by 'extend' pixels and the gray is filled with a continuation of the scene. Output: the whole extended canvas.",
+  "usage": [
+    "Extends the frame: new picture added around the plate (Outpaint LoRA).",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "With the panel open, drag the 'extend area' box outside the plate in the viewer. It starts as the whole plate, which adds nothing. Or pick an 'aspect' (16:9, 9:16, 1:1) to snap it to that shape around the plate.",
+    "Keep the prompt's first sentence (trigger); after 'Scene:' describe the whole visible picture.",
+    "Output: the whole bigger canvas; Bring in output adds a Transform that lines it up with the plate.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): Qwen Research License - research or evaluation only. Paid work needs a separate license from Qwen."
+  ],
+  "api": "qwen_outpaint.api.json",
+  "suffix": "QwenOutpaint",
+  "frames": "single",
+  "input_name": "plate",
+  "read": {
+    "node": "504"
+  },
+  "write": {
+    "node": "503"
+  },
+  "extend_area": {"node": "515"},
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "Qwen works on display-referred images, so highlights are rolled off or clipped (see the highlights knob).",
+    "offset": {"extend_area": true}
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.\nScene: ",
+      "node": "459:474",
+      "input": "prompt",
+      "tooltip": "Keep the first sentence - it is the LoRA's trigger. After 'Scene:' describe what is visible in the plate (the whole picture, not only the new part)."
+    },
+    {"name": "extend_area", "label": "extend area", "type": "bbox", "tooltip": "With the panel open, drag this box outside the plate in the viewer: the plate stays put and the area between the plate and the box is filled. It starts as the whole plate, which adds nothing, and a side pulled inside the plate adds nothing either. In plate pixels."},
+    {"name": "extend_aspect", "label": "aspect", "type": "choice", "values": ["custom", "16:9", "9:16", "1:1"], "default": "custom", "tooltip": "Snaps the extend area to the smallest box of that shape that holds the whole plate, centred on it. Move the box to put more of the new area on one side; dragging a handle changes the shape and sets this back to custom. Anamorphic plates: the shape as seen, with the pixel aspect counted."},
+    {
+      "name": "resolution",
+      "label": "resolution",
+      "type": "int",
+      "default": 1024,
+      "node": "459:474",
+      "input": "resolution",
+      "tooltip": "Pixel budget the canvas is rendered at (aspect kept): 1024 = about 1 MP, 1448 = about 2 MP (the LoRA was trained at 1-2 MP). The result is scaled back to plate pixels."
+    },
+    {
+      "name": "steps",
+      "label": "steps",
+      "type": "int",
+      "default": 25,
+      "node": "459:458",
+      "input": "steps",
+      "tooltip": "The official pipeline uses about 40-50."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "459:458",
+          "input": "seed"
+        }
+      ]
+    },
+    {
+      "name": "cfg",
+      "label": "cfg",
+      "type": "float",
+      "default": 1.0,
+      "min": 1.0,
+      "max": 10.0,
+      "node": "459:458",
+      "input": "cfg",
+      "tooltip": "Keep 1 (official). Raise it only together with a negative prompt."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "504", "input": "output_colorspace"}, {"node": "503", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "459:474",
+      "input": "negative_prompt",
+      "tooltip": "Only used when cfg is above 1."
+    }
+  ]
+}

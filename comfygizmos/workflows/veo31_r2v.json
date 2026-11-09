@@ -1,0 +1,189 @@
+{
+  "id": "veo31_r2v",
+  "label": "Veo 3.1 Reference to Video",
+  "description": "Google Veo 3.1 makes a new clip from a prompt that keeps the subjects / look of up to 3 reference pictures (the plate's frame + ref2, ref3). It does not start on the frame. Paid Google Vertex AI call per render. Output: an EXR sequence at Veo's own size, no audio.",
+  "usage": [
+    "Makes a new clip that keeps the look of up to 3 reference pictures (Google Veo 3.1).",
+    "Connect pictures to ref1-ref3 (ref1 can be the plate). The clip does not start on the frame.",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "Describe the shot and what to keep from the references.",
+    "Paid per render. Output: EXRs at Veo's own size, no audio.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): Google API terms - commercial use is allowed. Google doesn't claim your outputs, but may generate similar content for others. On the free tier Google can use prompts and outputs and human reviewers may see them, so don't send client plates there."
+  ],
+  "api": "veo31_r2v.api.json",
+  "suffix": "Veo31Ref",
+  "frames": "single",
+  "input_name": "ref1",
+  "read": {
+    "node": "100"
+  },
+  "write": {
+    "node": "103"
+  },
+  "refs": [
+    {
+      "name": "ref2",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image2"
+        }
+      ]
+    },
+    {
+      "name": "ref3",
+      "targets": [
+        {
+          "node": "2",
+          "input": "image3"
+        }
+      ]
+    }
+  ],
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "Veo makes a display-referred (sRGB) clip at its own size (16:9 or 9:16), not the plate's."
+  },
+  "aspect": {
+    "node": "2",
+    "input": "aspect_ratio",
+    "landscape": "16:9",
+    "portrait": "9:16"
+  },
+  "generated_frames": {
+    "knob": "duration",
+    "fps": 24
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "2",
+      "input": "prompt",
+      "tooltip": "Describe the new shot and what to keep from the references (the plate's frame, ref2, ref3)."
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "2",
+      "input": "negative_prompt",
+      "tooltip": "What the clip should not show."
+    },
+    {
+      "name": "model",
+      "label": "model",
+      "type": "choice",
+      "values": [
+        "VEO_3_1",
+        "VEO_3_1_FAST",
+        "VEO_3_1_LITE"
+      ],
+      "labels": [
+        "Veo 3.1",
+        "Veo 3.1 Fast",
+        "Veo 3.1 Lite"
+      ],
+      "default": "VEO_3_1",
+      "node": "2",
+      "input": "model",
+      "tooltip": "Veo 3.1 = best quality; Fast / Lite = cheaper and quicker."
+    },
+    {
+      "name": "duration",
+      "label": "duration",
+      "type": "choice",
+      "values": [
+        4,
+        6,
+        8
+      ],
+      "labels": [
+        "4 s (96 frames)",
+        "6 s (144 frames)",
+        "8 s (192 frames)"
+      ],
+      "default": 8,
+      "node": "2",
+      "input": "duration_seconds",
+      "tooltip": "Clip length at 24 fps. Longer costs more."
+    },
+    {
+      "name": "resolution",
+      "label": "resolution",
+      "type": "choice",
+      "values": [
+        "720p",
+        "1080p",
+        "4k"
+      ],
+      "labels": [
+        "720p",
+        "1080p",
+        "4K"
+      ],
+      "default": "1080p",
+      "node": "2",
+      "input": "output_resolution",
+      "tooltip": "Size Veo renders at (16:9, or 9:16 for a portrait plate - picked from the plate). The EXRs stay at that size. Bigger costs more."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 0,
+      "node": "2",
+      "input": "seed",
+      "zero_random": true,
+      "tooltip": "0 = random every render. Any other value repeats a result (with 'increment' it steps after each render)."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "100", "input": "output_colorspace"}, {"node": "103", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "person_generation",
+      "label": "person generation",
+      "type": "choice",
+      "values": [
+        "allow_adult",
+        "dont_allow"
+      ],
+      "labels": [
+        "allow adults",
+        "don't allow"
+      ],
+      "default": "allow_adult",
+      "node": "2",
+      "input": "person_generation",
+      "tooltip": "Whether Veo may show people."
+    },
+    {
+      "name": "gcp_project",
+      "label": "GCP project",
+      "type": "string",
+      "default": "",
+      "env_fallback": "GOOGLE_CLOUD_PROJECT",
+      "node": "2",
+      "input": "gcp_project_id",
+      "tooltip": "Google Cloud project billed for the Vertex AI call. Empty = the GOOGLE_CLOUD_PROJECT environment variable. Set your own default in ~/.nuke/comfygizmos_prefs.json: {\"knob_defaults\": {\"nano_banana2\": {\"gcp_project\": \"your-project\"}}}"
+    },
+    {
+      "name": "gcp_region",
+      "label": "GCP region",
+      "type": "string",
+      "default": "us-central1",
+      "node": "2",
+      "input": "gcp_region",
+      "tooltip": "Vertex AI region that runs Veo."
+    }
+  ]
+}

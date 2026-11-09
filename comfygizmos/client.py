@@ -1,6 +1,13 @@
 """Minimal ComfyUI HTTP client - stdlib only, so it runs in any Nuke Python."""
+import base64
 import json
+import os
+import socket
+import ssl
+import struct
+import threading
 import uuid
+import urllib.parse
 import urllib.error
 import urllib.request
 
@@ -77,9 +84,9 @@ def write_first_path(host, params):
     return first.replace("\\", "/")
 
 
-def submit(host, prompt):
+def submit(host, prompt, client_id=None):
     """Queue an API-format graph. Returns the prompt id."""
-    res = _request(host, "/prompt", {"prompt": prompt, "client_id": CLIENT_ID}, timeout=30)
+    res = _request(host, "/prompt", {"prompt": prompt, "client_id": client_id or CLIENT_ID}, timeout=30)
     if not res or "prompt_id" not in res:
         raise ComfyError("ComfyUI did not accept the job: {}".format(res))
     if res.get("node_errors"):
@@ -105,6 +112,99 @@ def status(host, prompt_id):
         if item[1] == prompt_id:
             return "queued", pos + 1
     return ("running", None) if entry else ("missing", None)
+
+
+class NodeWatcher(threading.Thread):
+    """Which node of a job ComfyUI is executing right now (.current), from its websocket. Submit the job with this
+    .client_id - ComfyUI tells only that client. Purely informative: if the socket fails, .current stays None."""
+
+    def __init__(self, host):
+        super(NodeWatcher, self).__init__(daemon=True)
+        self.client_id = "comfygizmos-" + uuid.uuid4().hex[:12]
+        self.current = None
+        self._stopped = False
+        self._buf = b""
+        self._sock = None
+        try:
+            self._connect(host)
+        except (OSError, ValueError):
+            self.stop()
+            return
+        self.start()
+
+    def _connect(self, host):
+        url = urllib.parse.urlparse(host)
+        secure = url.scheme == "https"
+        sock = socket.create_connection((url.hostname, url.port or (443 if secure else 80)), timeout=2)
+        if secure:
+            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=url.hostname)
+        self._sock = sock
+        sock.sendall(("GET {}/ws?clientId={} HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                      "Sec-WebSocket-Key: {}\r\nSec-WebSocket-Version: 13\r\n\r\n").format(
+            url.path.rstrip("/"), self.client_id, url.netloc,
+            base64.b64encode(os.urandom(16)).decode("ascii")).encode("ascii"))
+        while b"\r\n\r\n" not in self._buf:
+            data = sock.recv(4096)
+            if not data:
+                raise ValueError("closed during the handshake")
+            self._buf += data
+        head, self._buf = self._buf.split(b"\r\n\r\n", 1)
+        if b" 101" not in head.split(b"\r\n", 1)[0]:
+            raise ValueError("no websocket upgrade")
+        sock.settimeout(1)                                  # so stop() is noticed while waiting
+
+    def _read(self, n):
+        while len(self._buf) < n:
+            if self._stopped:
+                raise OSError("stopped")
+            try:
+                data = self._sock.recv(65536)
+            except socket.timeout:
+                continue
+            if not data:
+                raise OSError("closed")
+            self._buf += data
+        out, self._buf = self._buf[:n], self._buf[n:]
+        return out
+
+    def run(self):
+        try:
+            while True:
+                b0, b1 = struct.unpack("BB", self._read(2))
+                size = b1 & 0x7F
+                if size == 126:
+                    size = struct.unpack(">H", self._read(2))[0]
+                elif size == 127:
+                    size = struct.unpack(">Q", self._read(8))[0]
+                mask = self._read(4) if b1 & 0x80 else None
+                payload = self._read(size)
+                if mask:
+                    payload = bytes(c ^ mask[i % 4] for i, c in enumerate(payload))
+                opcode = b0 & 0x0F
+                if opcode == 8:                             # close
+                    break
+                if opcode == 9 and size <= 125:             # ping -> masked pong
+                    self._sock.sendall(bytes([0x8A, 0x80 | size, 0, 0, 0, 0]) + payload)
+                elif opcode == 1:                           # text; binary frames are previews
+                    msg = json.loads(payload.decode("utf-8"))
+                    if msg.get("type") == "executing":
+                        self.current = (msg.get("data") or {}).get("node")
+        except (OSError, ValueError, struct.error):
+            pass
+        finally:
+            self._close()
+
+    def stop(self):
+        self._stopped = True
+        if not self.is_alive():
+            self._close()
+
+    def _close(self):
+        try:
+            if self._sock is not None:
+                self._sock.close()
+        except OSError:
+            pass
 
 
 def _execution_error(messages):

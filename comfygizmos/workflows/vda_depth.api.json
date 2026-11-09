@@ -1,0 +1,112 @@
+{
+  "1": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "auto",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {
+      "title": "Source Plate - OCIO Read"
+    }
+  },
+  "2": {
+    "inputs": {
+      "blend_factor": 0,
+      "blend_mode": "normal",
+      "image1": [
+        "1",
+        0
+      ],
+      "image2": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ImageBlend",
+    "_meta": {
+      "title": "Clamp 0-1 (VDA wraps values outside 0-1)"
+    }
+  },
+  "3": {
+    "inputs": {
+      "model": "video_depth_anything_vitl.pth"
+    },
+    "class_type": "LoadVideoDepthAnythingModel",
+    "_meta": {
+      "title": "Load VDA Large"
+    }
+  },
+  "4": {
+    "inputs": {
+      "input_size": 518,
+      "max_res": 8192,
+      "precision": "fp16",
+      "vda_model": [
+        "3",
+        0
+      ],
+      "images": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "VideoDepthAnythingProcess",
+    "_meta": {
+      "title": "Video Depth Anything"
+    }
+  },
+  "5": {
+    "inputs": {
+      "colormap": "gray",
+      "depths": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "VideoDepthAnythingOutput",
+    "_meta": {
+      "title": "Depth to Image (0-1 over the clip)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "32f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": true,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 23.976,
+      "render_nonce": "",
+      "images": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {
+      "title": "Depth Write - raw 32-bit EXR sequence"
+    }
+  }
+}

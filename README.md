@@ -1,3 +1,5 @@
+![ComfyGizmos](docs/banner.jpg)
+
 # ComfyGizmos
 
 ComfyUI workflows as Nuke nodes. Connect a plate, press **Render in ComfyUI**,

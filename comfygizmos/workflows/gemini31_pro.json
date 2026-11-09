@@ -2,6 +2,14 @@
   "id": "gemini31_pro",
   "label": "Gemini 3.1 Pro",
   "description": "Ask Gemini 3.1 Pro about a frame, a frame range (sent as video) or just a prompt. Text out only: the reply lands in 'reply' below, the plate passes through. Paid Google Vertex AI call per run.",
+  "usage": [
+    "Ask Gemini 3.1 Pro about the plate - text answer only, the image passes through.",
+    "'send': the frame, the frame range as a video, or text only.",
+    "Type the question in 'prompt'. The reply appears under the controls; Copy reply / Send to prompt below passes it on.",
+    "Paid Google Vertex AI call per render (GCP project from your prefs).",
+    "highlights: 'roll off' (default) compresses values above 1 in what Gemini sees, and darkens shadows. 'clip' cuts at 1.",
+    "License (checked 2026-11): Google API terms - commercial use is allowed. Google doesn't claim your outputs, but may generate similar content for others. On the free tier Google can use prompts and outputs and human reviewers may see them, so don't send client plates there."
+  ],
   "api": "gemini31_pro.api.json",
   "suffix": "Gemini31Pro",
   "default_name": "Chat",
@@ -99,6 +107,7 @@
       "input": "max_output_tokens",
       "tooltip": "Longest reply (1-8192 tokens; ~750 words per 1000 tokens)."
     },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "6", "input": "output_colorspace"}], "tooltip": "What Gemini sees. roll off (default): the image goes in through ACES Output - sRGB, so highlights are compressed instead of cut, but shadows get darker and colours take on the ACES look. clip: values above 1 become 1 (colorimetric), shadows stay open."},
     {
       "name": "advanced",
       "label": "advanced",

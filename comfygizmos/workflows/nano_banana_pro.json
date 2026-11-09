@@ -1,7 +1,17 @@
 {
   "id": "nano_banana_pro",
   "label": "Nano Banana Pro",
-  "description": "Gemini 3 Pro Image (Nano Banana Pro) edit of one frame by a text prompt, with up to 5 reference images. Paid Google Vertex AI call per render (more than Nano Banana 2). Output: the edited frame at plate size.",
+  "description": "Gemini 3 Pro Image (Nano Banana Pro) edit of one frame by a text prompt, with up to 5 reference images. Paid Google Vertex AI call per render (more than Nano Banana 2). Output: the edited frame at plate size. With no plate connected, it makes a new image from the prompt.",
+  "usage": [
+    "Edits one frame from a text prompt (Gemini Nano Banana Pro), with up to 5 reference images.",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "The plate is image 1, ref2-ref6 are images 2-6 - connect them without gaps and name them by number.",
+    "Crop: tick 'crop' and move the box in the viewer to send only that area (more detail on small fixes).",
+    "Paid Google Vertex AI call per render. It regenerates the whole frame - comp back only what changed.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "Text to image: connect nothing to 'plate'. Pick 'aspect ratio' and 'image size'; the result stays at the model's own size. Refs still work and count from image 1. 'crop' is ignored.",
+    "License (checked 2026-11): Google API terms - commercial use is allowed. Google doesn't claim your outputs, but may generate similar content for others. On the free tier Google can use prompts and outputs and human reviewers may see them, so don't send client plates there."
+  ],
   "api": "nano_banana_pro.api.json",
   "suffix": "NanoBananaPro",
   "frames": "single",
@@ -12,6 +22,10 @@
   "write": {
     "node": "7"
   },
+  "crop": {
+    "default": false
+  },
+  "no_plate": {"remove": ["6", "8", "9", "10"], "unlink": [{"node": "2", "input": "image1"}], "set": [{"knob": "aspect_ratio", "node": "2", "input": "aspect_ratio"}], "write_images": ["2", 0]},
   "refs": [
     {
       "name": "ref2",
@@ -63,7 +77,7 @@
     "kind": "image",
     "colorspace": "ACES - ACES2065-1",
     "convert": true,
-    "tooltip": "Nano Banana Pro works on display-referred (sRGB Texture) images, so values above 1.0 are clipped, and it regenerates the whole frame. Comp the edit back over the plate only where it changed."
+    "tooltip": "Nano Banana Pro works on display-referred images, so highlights are rolled off or clipped (see the highlights knob), and it regenerates the whole frame. Comp the edit back over the plate only where it changed."
   },
   "knobs": [
     {
@@ -73,7 +87,7 @@
       "default": "",
       "node": "2",
       "input": "prompt",
-      "tooltip": "The edit instruction. The plate is the first image; ref2-ref6 are images 2-6."
+      "tooltip": "The edit instruction. The plate is the first image; ref2-ref6 are images 2-6. With no plate: describe the image, and refs count from image 1."
     },
     {
       "name": "image_size",
@@ -87,8 +101,9 @@
       "default": "4K",
       "node": "2",
       "input": "image_size",
-      "tooltip": "Resolution Nano Banana Pro renders at. The result is scaled back to plate size, so on a 4K plate 1K is upscaled ~3.5x. Bigger costs more."
+      "tooltip": "Resolution Nano Banana Pro renders at. The result is scaled back to plate size, so on a 4K plate 1K is upscaled ~3.5x. Bigger costs more. With no plate, this is the final size."
     },
+    {"name": "aspect_ratio", "label": "aspect ratio", "type": "choice", "values": ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"], "default": "16:9", "tooltip": "Text to image only, with no plate connected. Greyed out with a plate, which sets the aspect itself."},
     {
       "name": "temperature",
       "label": "temperature",
@@ -100,6 +115,7 @@
       "input": "temperature",
       "tooltip": "Randomness. Lower = more literal edits that change less between renders; higher = more varied. There is no seed, so every render differs."
     },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "6", "input": "output_colorspace"}, {"node": "7", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area. With no plate, it only sets how the result comes back, and how refs go in."},
     {
       "name": "advanced",
       "label": "advanced",

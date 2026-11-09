@@ -1,0 +1,216 @@
+{
+  "id": "fasth3_i2v",
+  "label": "MiniMax FastH3 Image to Video",
+  "description": "FastVideo FastH3 (local, 8-step distilled MiniMax H3) generates a new clip from a start frame - and optionally an end frame - and a prompt. Faster than H3, a little less detail. Output: an EXR sequence at the model's own size, numbered from the chosen frame, no audio.",
+  "usage": [
+    "Turns one frame into a new clip (MiniMax FastH3, 8-step - faster than H3, a little less detail).",
+    "Connect the start frame to 'first'; optionally an end frame to 'last'.",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "Prompt the motion and camera; the start frame is <Picture 1>. Pick the length in 'frames'.",
+    "Output: EXRs at H3's own size, numbered from the sent frame, no audio.",
+    "Optional 'enhance prompt': a local LLM expands your short prompt into H3's structured description (Run enhancer only to preview it in 'refined prompt').",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "remove audio from prompt description (advanced, on by default): clears the sound sections from the refined prompt. Dialogue in the visual description stays.",
+    "License (checked 2026-11): MiniMax H3 Community - not authorized in the US, EU, UK or South Korea, outputs included. Commercial use is free under $20M a year; above that needs MiniMax's written authorization. Outputs can't be used to improve other AI models."
+  ],
+  "api": "fasth3_i2v.api.json",
+  "suffix": "FastH3",
+  "frames": "single",
+  "input_name": "first",
+  "read": {
+    "node": "100"
+  },
+  "write": {
+    "node": "103"
+  },
+  "refs": [
+    {
+      "name": "last",
+      "targets": [
+        {
+          "node": "105:104",
+          "input": "last_frame"
+        },
+        {
+          "node": "200",
+          "input": "last_frame"
+        }
+      ],
+      "flags": [
+        {
+          "node": "200",
+          "input": "task",
+          "value": "FL2VA"
+        }
+      ]
+    }
+  ],
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "H3 makes a display-referred (sRGB) clip at its own size, not the plate's."
+  },
+  "size": {
+    "megapixels_knob": "megapixels",
+    "multiple": 32,
+    "width": [
+      {
+        "node": "105:104",
+        "input": "width"
+      }
+    ],
+    "height": [
+      {
+        "node": "105:104",
+        "input": "height"
+      }
+    ],
+    "aspect_text": [
+      {
+        "node": "200",
+        "input": "aspect_ratio"
+      }
+    ]
+  },
+  "generated_frames": {
+    "knob": "frames",
+    "seconds": [
+      {
+        "node": "200",
+        "input": "duration"
+      }
+    ],
+    "model_fps": 24
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "tooltip": "The motion, shots and look of the clip. The start frame is <Picture 1>.",
+      "targets": [
+        {
+          "node": "201",
+          "input": "on_false"
+        },
+        {
+          "node": "200",
+          "input": "prompt"
+        }
+      ]
+    },
+    {
+      "name": "frames",
+      "label": "frames",
+      "type": "choice",
+      "default": 124,
+      "values": [
+        5,
+        22,
+        39,
+        56,
+        73,
+        90,
+        107,
+        124,
+        141,
+        158,
+        175,
+        192,
+        209,
+        226,
+        243,
+        260,
+        277,
+        294,
+        311,
+        328,
+        345,
+        362
+      ],
+      "labels": [
+        "5 (0.2 s)",
+        "22 (0.9 s)",
+        "39 (1.6 s)",
+        "56 (2.3 s)",
+        "73 (3.0 s)",
+        "90 (3.8 s)",
+        "107 (4.5 s)",
+        "124 (5.2 s)",
+        "141 (5.9 s)",
+        "158 (6.6 s)",
+        "175 (7.3 s)",
+        "192 (8.0 s)",
+        "209 (8.7 s)",
+        "226 (9.4 s)",
+        "243 (10.1 s)",
+        "260 (10.8 s)",
+        "277 (11.5 s)",
+        "294 (12.2 s)",
+        "311 (13.0 s)",
+        "328 (13.7 s)",
+        "345 (14.4 s)",
+        "362 (15.1 s)"
+      ],
+      "node": "105:104",
+      "input": "length",
+      "tooltip": "Clip length: only the counts H3 accepts (17k+5, at 24 fps). It was trained on 124-362 frames (5-15 s); shorter clips may look worse."
+    },
+    {
+      "name": "megapixels",
+      "label": "megapixels",
+      "type": "float",
+      "default": 0.4,
+      "min": 0.2,
+      "max": 2.0,
+      "tooltip": "Size FastH3 renders at, with the plate's aspect (multiple of 32). 0.4 = the template's default (about 832x480 at 16:9); 0.98 = H3's full 768p (1344x768)."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "node": "105:15",
+      "input": "noise_seed"
+    },
+    {
+      "name": "enhance_prompt",
+      "label": "enhance prompt",
+      "type": "bool",
+      "default": false,
+      "node": "201",
+      "input": "switch",
+      "tooltip": "Let the local MiniMax-H3 prompt rewriter (LightX2V LoRA) expand the prompt into H3's structured description first. It looks at the inputs itself. Slower; off = the prompt goes to H3 as typed."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "100", "input": "output_colorspace"}, {"node": "103", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {"name": "remove_audio", "label": "remove audio from prompt description", "type": "bool", "default": true, "near_refined": true, "node": "211", "input": "switch", "tooltip": "Clears the sound sections of the refined prompt: overall_soundscape and non_diegetic_music become N/A, and the section names stay. Only applies with 'enhance prompt' on. Dialogue written in the visual description stays, and H3 still generates an audio track, which this gizmo doesn't use."},
+    {
+      "name": "steps",
+      "label": "steps",
+      "type": "int",
+      "default": 8,
+      "node": "105:9",
+      "input": "steps",
+      "tooltip": "The checkpoint is distilled for 8 steps."
+    }
+  ],
+  "enhancer": {
+    "after": "enhance_prompt",
+    "output_node": "202", "nodes": ["200"],
+    "force": [
+      {
+        "node": "201",
+        "input": "switch",
+        "value": true
+      }
+    ]
+  }
+}

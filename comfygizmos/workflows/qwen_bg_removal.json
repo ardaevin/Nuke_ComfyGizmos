@@ -1,0 +1,110 @@
+{
+  "id": "qwen_bg_removal",
+  "label": "Qwen Remove Background",
+  "description": "Qwen-Image 2.1 removes the background of one frame and returns RGBA. Output: the frame at plate size with the model's alpha (premultiplied on read).",
+  "usage": [
+    "Removes the background of one frame and writes RGBA (Qwen Image 2.1).",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "Say what to remove / keep in the prompt; the wording decides whether Qwen returns real alpha.",
+    "Crop: tick 'crop' and move the box in the viewer to send only that area (more detail on small fixes).",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): Qwen Research License - research or evaluation only. Paid work needs a separate license from Qwen."
+  ],
+  "api": "qwen_bg_removal.api.json",
+  "suffix": "QwenBGRemove",
+  "frames": "single",
+  "input_name": "plate",
+  "read": {
+    "node": "504"
+  },
+  "write": {
+    "node": "503"
+  },
+  "crop": {
+    "default": false
+  },
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "straight_alpha": true,
+    "tooltip": "Qwen works on display-referred images, so highlights are rolled off or clipped (see the highlights knob). The alpha is the model's; use it as a matte over the original plate where colour matters."
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "Remove the background, and output a PNG image",
+      "node": "459:474",
+      "input": "prompt",
+      "tooltip": "The template's instruction. Name what to keep to steer it, e.g. 'Keep only the man in the red coat, remove everything else'. The plate is <image1>."
+    },
+    {
+      "name": "resolution",
+      "label": "resolution",
+      "type": "int",
+      "default": 0,
+      "node": "459:474",
+      "input": "resolution",
+      "tooltip": "Pixel budget (aspect kept). 0 = the plate's own size; up to 2048 (use 2048 for 4K plates). The result is scaled back to plate size."
+    },
+    {
+      "name": "steps",
+      "label": "steps",
+      "type": "int",
+      "default": 25,
+      "node": "459:458",
+      "input": "steps",
+      "tooltip": "The official pipeline uses about 40-50."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "459:458",
+          "input": "seed"
+        }
+      ]
+    },
+    {
+      "name": "cfg",
+      "label": "cfg",
+      "type": "float",
+      "default": 1.0,
+      "min": 1.0,
+      "max": 10.0,
+      "node": "459:458",
+      "input": "cfg",
+      "tooltip": "Keep 1 (official). Raise it only together with a negative prompt."
+    },
+    {
+      "name": "consistency",
+      "label": "consistency LoRA",
+      "type": "bool",
+      "default": true,
+      "node": "459:521",
+      "input": "switch",
+      "tooltip": "Qwen Image 2.1 Consistency LoRA (ausboss): keeps the edit on the plate's framing - no drift in scale or position, untouched areas stay untouched. It can resist big moves (a new pose) and leave a faint ghost after large removals - turn it off for those."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "504", "input": "output_colorspace"}, {"node": "503", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "459:474",
+      "input": "negative_prompt",
+      "tooltip": "Only used when cfg is above 1."
+    }
+  ]
+}

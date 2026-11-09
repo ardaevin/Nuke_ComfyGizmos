@@ -2,23 +2,60 @@
   "id": "dsine_normals",
   "label": "DSINE Normals",
   "description": "DSINE single-frame surface normals (camera space). Output: raw EXR at plate size, 0-1 encoded; the node shows them decoded to -1..1.",
+  "usage": [
+    "Camera-space normals from one frame (DSINE).",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "Set 'fov' close to the shot's lens; more iterations = cleaner, slower.",
+    "Output: 0-1 encoded normals; the node shows them decoded to -1..1.",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: what the model sees. 'clip' (default) cuts at 1 and keeps shadows open. 'roll off' compresses highlights but crushes deep shadows.",
+    "License (checked 2026-11): DSINE (Imperial College) - non-commercial, internal or academic research only. Paid work needs a license from Imperial."
+  ],
   "api": "dsine_normals.api.json",
   "suffix": "DSINENormal",
   "frames": "single",
   "input_name": "plate",
-
-  "read":  {"node": "1"},
-  "write": {"node": "5"},
-
-  "output": {"kind": "normals", "raw": true,
-             "tooltip": "Normals are vectors, not colour: written and read as raw. DSINE's own output is 8-bit, so the half-float EXR adds no precision."},
-
+  "read": {
+    "node": "1"
+  },
+  "write": {
+    "node": "5"
+  },
+  "output": {
+    "kind": "normals",
+    "raw": true,
+    "tooltip": "Normals are vectors, not colour: written and read as raw. DSINE's own output is 8-bit, so the half-float EXR adds no precision."
+  },
   "knobs": [
-    {"name": "fov", "label": "fov", "type": "float", "node": "2", "input": "fov", "default": 60.0, "min": 1.0, "max": 180.0,
-     "tooltip": "Horizontal field of view of the lens in degrees (DSINE is camera-aware). Desqueeze anamorphic first."},
-    {"name": "iterations", "label": "iterations", "type": "int", "node": "2", "input": "iterations", "default": 5,
-     "tooltip": "Refinement passes (1-20). Raise for detailed scenes."},
-    {"name": "resolution", "label": "resolution", "type": "int", "node": "2", "input": "resolution", "default": 1024,
-     "tooltip": "Processing resolution, step 64. Higher = more detail, more VRAM. The result is scaled back to plate size."}
+    {
+      "name": "fov",
+      "label": "fov",
+      "type": "float",
+      "node": "2",
+      "input": "fov",
+      "default": 60.0,
+      "min": 1.0,
+      "max": 180.0,
+      "tooltip": "Horizontal field of view of the lens in degrees (DSINE is camera-aware). Desqueeze anamorphic first."
+    },
+    {
+      "name": "iterations",
+      "label": "iterations",
+      "type": "int",
+      "node": "2",
+      "input": "iterations",
+      "default": 5,
+      "tooltip": "Refinement passes (1-20). Raise for detailed scenes."
+    },
+    {
+      "name": "resolution",
+      "label": "resolution",
+      "type": "int",
+      "node": "2",
+      "input": "resolution",
+      "default": 1024,
+      "tooltip": "Processing resolution, step 64. Higher = more detail, more VRAM. The result is scaled back to plate size."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Utility - sRGB - Texture", "targets": [{"node": "1", "input": "output_colorspace"}], "tooltip": "What the model sees; only the input changes, as normals is data and isn't converted back. clip (default): values above 1 become 1 (colorimetric), shadows stay open. roll off: the plate goes in through ACES Output - sRGB, so highlights are compressed instead of cut, but deep shadows are crushed. Try roll off on shots with large blown-out areas."}
   ]
 }

@@ -1,0 +1,147 @@
+{
+  "id": "ltx_refine",
+  "label": "LTX Refine",
+  "description": "LTX-2.5 Tiled Fusion with the Refine Details IC-LoRA: re-renders a frame range with new detail at the output size you pick. Output: an EXR sequence in ACES2065-1 at the upscaled size, plate frame numbers, no audio.",
+  "usage": [
+    "Re-renders a frame range at the output size you pick, generating new detail (LTX-2.5 Tiled Fusion).",
+    "Whole input range is sent; tick 'input range' to send only first-last.",
+    "prompt is optional: describe only look and style. Don't name objects or people, as they can stamp into every tile.",
+    "'tile size' is how much the model sees at once: bigger = more context, more VRAM. If it crashes, lower tile size, output size or the frame count.",
+    "Detail is generated, so faces, text and fine patterns can drift. On 'clip', values above 1 are cut and the result stays in 0-1. Check it against the plate.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): LTX-2.x Community - commercial use is free under $10M annual revenue (affiliates count); above that needs a paid license. Generated content must be disclosed as machine-generated when distributed."
+  ],
+  "api": "ltx_refine.api.json",
+  "suffix": "LTXRefine",
+  "input_name": "plate",
+  "max_frames": 241,
+  "max_frames_input": {
+    "node": "9204",
+    "input": "max_frames",
+    "tooltip": "Longer ranges need more VRAM and RAM."
+  },
+  "read": {
+    "node": "9203"
+  },
+  "write": {
+    "node": "9207"
+  },
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "LTX works on display-referred images, so highlights are rolled off or clipped (see the highlights knob). The result is at the upscaled size, not the plate's."
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "5508",
+      "input": "value",
+      "tooltip": "Optional. Look and style only: lighting, palette, film stock, sharpness, grade. The plate supplies the scene. Anything you name can stamp into every tile."
+    },
+    {
+      "name": "refine_prompt",
+      "label": "refine prompt",
+      "type": "bool",
+      "default": false,
+      "node": "5014:5556",
+      "input": "switch",
+      "tooltip": "Let the local Gemma enhancer rewrite the prompt first (from the text only, it doesn't see the plate). Slower, and it can add objects that stamp into the tiles."
+    },
+    {
+      "name": "output_size",
+      "label": "output size",
+      "type": "choice",
+      "values": [
+        "FullHD",
+        "4K",
+        "8K"
+      ],
+      "default": "4K",
+      "node": "9002:9200",
+      "input": "output_size",
+      "tooltip": "Final canvas long edge: FullHD 1920, 4K 3840, 8K 7680. 8K is untested here and likely to run out of memory."
+    },
+    {
+      "name": "tile_size",
+      "label": "tile size",
+      "type": "choice",
+      "values": [
+        "qHD",
+        "HD",
+        "FullHD"
+      ],
+      "default": "HD",
+      "node": "9002:9200",
+      "input": "tile_size",
+      "tooltip": "Long edge of each tile: qHD 960, HD 1280, FullHD 1920. Bigger = more context for the model, more VRAM."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "5516:9100",
+          "input": "seed"
+        },
+        {
+          "node": "5014:9004",
+          "input": "sampling_mode.seed"
+        }
+      ]
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "9203", "input": "output_colorspace"}, {"node": "9207", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "5509",
+      "input": "value"
+    },
+    {
+      "name": "lora_strength",
+      "label": "LoRA strength",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0,
+      "node": "5004:5606",
+      "input": "strength_model",
+      "tooltip": "Strength of the Refine Details IC-LoRA."
+    },
+    {
+      "name": "tiled_encode",
+      "label": "use tiled encode",
+      "type": "bool",
+      "default": true,
+      "node": "9002:5012",
+      "input": "use_tiled_encode",
+      "tooltip": "Encode the guide video in tiles to lower the GPU load at big sizes. Off is how Lightricks' workflow ships: less risk of tile effects, but a 4K guide can crash the GPU."
+    }
+  ],
+  "enhancer": {
+    "after": "refine_prompt",
+    "output_node": "5544",
+    "nodes": [
+      "5014:9004"
+    ],
+    "force": [
+      {
+        "node": "5014:5556",
+        "input": "switch",
+        "value": true
+      }
+    ]
+  }
+}

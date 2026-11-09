@@ -49,7 +49,7 @@
     "inputs": {
       "max_width": 1920,
       "max_height": 1088,
-      "scale": 0.5,
+      "scale": 1.0,
       "max_frames": 145,
       "images": [
         "9010",

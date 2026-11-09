@@ -1,0 +1,370 @@
+{
+  "105:11": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "105:10": {
+    "inputs": {
+      "samples": [
+        "105:14",
+        0
+      ],
+      "vae": [
+        "105:11",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "105:17": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "105:9": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "105:123",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "105:122",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "105:14": {
+    "inputs": {
+      "noise": [
+        "105:15",
+        0
+      ],
+      "guider": [
+        "105:16",
+        0
+      ],
+      "sampler": [
+        "105:17",
+        0
+      ],
+      "sigmas": [
+        "105:9",
+        0
+      ],
+      "latent_image": [
+        "105:104",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "105:16": {
+    "inputs": {
+      "model": [
+        "105:122",
+        0
+      ],
+      "conditioning": [
+        "105:104",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "105:6": {
+    "inputs": {
+      "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "105:13": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "105:15": {
+    "inputs": {
+      "noise_seed": 42
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "105:104": {
+    "inputs": {
+      "prompt": [
+        "201",
+        0
+      ],
+      "width": 1344,
+      "height": 768,
+      "length": 124,
+      "clip": [
+        "105:13",
+        0
+      ],
+      "vae": [
+        "105:11",
+        0
+      ],
+      "first_frame": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ImageToVideo",
+    "_meta": {
+      "title": "MiniMax H3 Image to Video"
+    }
+  },
+  "105:121": {
+    "inputs": {
+      "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "105:6",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "105:122": {
+    "inputs": {
+      "switch": [
+        "105:126",
+        0
+      ],
+      "on_false": [
+        "105:6",
+        0
+      ],
+      "on_true": [
+        "105:121",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch (Model)"
+    }
+  },
+  "105:123": {
+    "inputs": {
+      "switch": [
+        "105:126",
+        0
+      ],
+      "on_false": [
+        "105:124",
+        0
+      ],
+      "on_true": [
+        "105:125",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch (Steps)"
+    }
+  },
+  "105:124": {
+    "inputs": {
+      "value": 20
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int"
+    }
+  },
+  "105:125": {
+    "inputs": {
+      "value": 8
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int"
+    }
+  },
+  "105:126": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Boolean (Enable Lightning LoRA)"
+    }
+  },
+  "100": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "single",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {
+      "title": "Source Plate - OCIO Read (one frame: EXR / PNG / seq frame) [single frame]"
+    }
+  },
+  "103": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "16f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": false,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 23.976,
+      "render_nonce": "",
+      "images": [
+        "105:10",
+        0
+      ]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {
+      "title": "Edit Write - ACES2065-1 EXR (named after the plate frame)"
+    }
+  },
+  "200": {
+    "class_type": "MiniMaxH3PromptWriter8B",
+    "inputs": {
+      "prompt": "",
+      "model": "Qwen3-VL-8B-Instruct GGUF Q4_K_M · 5.4 GB download · ~9 GB with the adapter",
+      "task": "I2VA",
+      "resolution": "16:9",
+      "duration": 5.17,
+      "quantization": "nf4",
+      "greedy": true,
+      "seed": 42,
+      "keep_model_loaded": false,
+      "aspect_ratio": "",
+      "first_frame": [
+        "100",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "H3 prompt rewriter 8B"
+    }
+  },
+  "201": {
+    "class_type": "ComfySwitchNode",
+    "inputs": {
+      "switch": false,
+      "on_false": "",
+      "on_true": [
+        "211",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Enhance prompt?"
+    }
+  },
+  "202": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "201",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Rewritten prompt"
+    }
+  },
+  "210": {
+    "inputs": {
+      "string": [
+        "200",
+        0
+      ],
+      "regex_pattern": "\\boverall_soundscape:.*",
+      "replace": "overall_soundscape: N/A\n\nnon_diegetic_music: N/A",
+      "case_insensitive": true,
+      "multiline": false,
+      "dotall": true,
+      "count": 1
+    },
+    "class_type": "RegexReplace",
+    "_meta": {
+      "title": "Clear the sound sections"
+    }
+  },
+  "211": {
+    "inputs": {
+      "switch": true,
+      "on_false": [
+        "200",
+        0
+      ],
+      "on_true": [
+        "210",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Remove audio?"
+    }
+  }
+}

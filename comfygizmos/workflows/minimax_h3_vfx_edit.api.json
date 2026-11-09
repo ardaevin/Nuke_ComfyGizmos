@@ -1,0 +1,452 @@
+{
+  "100": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "single",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {
+      "title": "Source Plate - OCIO Read (one frame: EXR / PNG / seq frame) [single frame]"
+    }
+  },
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "H3 ref2va"
+    }
+  },
+  "2": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "lora_name": "minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "VFX Edit LoRA"
+    }
+  },
+  "3": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "lora_name": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "Turbo 4-step"
+    }
+  },
+  "4": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    },
+    "_meta": {
+      "title": "Sigma shift"
+    }
+  },
+  "5": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "H3 text encoder"
+    }
+  },
+  "6": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "_meta": {
+      "title": "H3 video VAE"
+    }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "H3 audio VAE"
+    }
+  },
+  "8": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "100",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 672,
+      "height": 384,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Source to work size"
+    }
+  },
+  "9": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "5",
+        0
+      ],
+      "text": ""
+    },
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "13": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "8",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 672,
+      "height": 384,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "First frame to work size"
+    }
+  },
+  "10": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "inputs": {
+      "clip": [
+        "5",
+        0
+      ],
+      "vae": [
+        "6",
+        0
+      ],
+      "audio_vae": [
+        "7",
+        0
+      ],
+      "prompt": "",
+      "width": 672,
+      "height": 384,
+      "length": 124,
+      "ref_image_size": "match",
+      "ref_images.ref_image_0": [
+        "13",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Prompt + <Picture 1>"
+    }
+  },
+  "11": {
+    "class_type": "ComfySwitchNode",
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "9",
+        0
+      ],
+      "on_true": [
+        "10",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "First frame connected? (conditioning)"
+    }
+  },
+  "14": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "8",
+        0
+      ],
+      "batch_index": 1,
+      "length": 4096
+    },
+    "_meta": {
+      "title": "Guide without frame 1"
+    }
+  },
+  "15": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "13",
+        0
+      ],
+      "image2": [
+        "14",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Edited frame + guide"
+    }
+  },
+  "16": {
+    "class_type": "ComfySwitchNode",
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "8",
+        0
+      ],
+      "on_true": [
+        "15",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "First frame connected? (guide)"
+    }
+  },
+  "17": {
+    "class_type": "EmptyMiniMaxH3LatentAV",
+    "inputs": {
+      "width": 672,
+      "height": 384,
+      "length": 124
+    },
+    "_meta": {
+      "title": "Latent"
+    }
+  },
+  "18": {
+    "class_type": "MiniMaxH3AddGuide",
+    "inputs": {
+      "positive": [
+        "11",
+        0
+      ],
+      "latent": [
+        "17",
+        0
+      ],
+      "frame_idx": 0,
+      "vae": [
+        "6",
+        0
+      ],
+      "audio_vae": [
+        "7",
+        0
+      ],
+      "image": [
+        "16",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Source as aligned guide"
+    }
+  },
+  "19": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "positive": [
+        "18",
+        0
+      ],
+      "negative": [
+        "18",
+        0
+      ],
+      "cfg": 1.0
+    },
+    "_meta": {
+      "title": "Guider"
+    }
+  },
+  "20": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 42
+    },
+    "_meta": {
+      "title": "Noise"
+    }
+  },
+  "21": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "Sampler"
+    }
+  },
+  "22": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 4,
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "Scheduler"
+    }
+  },
+  "23": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "20",
+        0
+      ],
+      "guider": [
+        "19",
+        0
+      ],
+      "sampler": [
+        "21",
+        0
+      ],
+      "sigmas": [
+        "22",
+        0
+      ],
+      "latent_image": [
+        "17",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Sample"
+    }
+  },
+  "24": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "23",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Video latent"
+    }
+  },
+  "25": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "24",
+        0
+      ],
+      "vae": [
+        "6",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode"
+    }
+  },
+  "26": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "25",
+        0
+      ],
+      "batch_index": 0,
+      "length": 124
+    },
+    "_meta": {
+      "title": "Trim to the sent frames"
+    }
+  },
+  "27": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "26",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1920,
+      "height": 1080,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Back to plate size"
+    }
+  },
+  "103": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "16f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": false,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 23.976,
+      "render_nonce": "",
+      "images": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {
+      "title": "Edit Write - ACES2065-1 EXR (named after the plate frame)"
+    }
+  }
+}

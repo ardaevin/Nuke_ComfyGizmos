@@ -1,0 +1,212 @@
+{
+  "id": "minimax_h3_vfx_edit",
+  "label": "MiniMax H3 VFX Edit",
+  "description": "MiniMax H3 + Alissonerdx's VFX Edit LoRAs: the same take back with only the prompted change (add, remove, replace), following the plate's motion and camera. Optional 'first_frame': an already edited first frame that the edit should carry through the shot. Output: EXRs at plate size, no audio.",
+  "usage": [
+    "Edits a shot: the same take back with only the prompted change (add, remove, replace).",
+    "Start the prompt with 'vfx_edit:' - one sentence: the edit, then what must stay the same.",
+    "Whole input range is sent; tick 'input range' to send only first-last.",
+    "Optional 'first_frame': a frame you already fixed; name it <Picture 1> in the prompt and the edit is carried through the shot (use an FFP LoRA).",
+    "Comp the result back only where the edit is.",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): MiniMax H3 Community - not authorized in the US, EU, UK or South Korea, outputs included. Commercial use is free under $20M a year; above that needs MiniMax's written authorization. Outputs can't be used to improve other AI models. The LoRAs' own licenses are unconfirmed."
+  ],
+  "api": "minimax_h3_vfx_edit.api.json",
+  "suffix": "H3VFXEdit",
+  "input_name": "plate",
+  "max_frames": 362,
+  "read": {
+    "node": "100"
+  },
+  "write": {
+    "node": "103"
+  },
+  "refs": [
+    {
+      "name": "first_frame",
+      "targets": [
+        {
+          "node": "13",
+          "input": "image"
+        }
+      ],
+      "flags": [
+        {
+          "node": "11",
+          "input": "switch"
+        },
+        {
+          "node": "16",
+          "input": "switch"
+        }
+      ]
+    }
+  ],
+  "ref_prompt_tag": {
+    "ref": "first_frame",
+    "knob": "prompt",
+    "tag": "<Picture 1>"
+  },
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "H3 makes a display-referred (sRGB) clip at its work size; it is scaled back to plate size. Comp it back only where the edit is."
+  },
+  "size": {
+    "megapixels_knob": "megapixels",
+    "multiple": 32,
+    "width": [
+      {
+        "node": "8",
+        "input": "width"
+      },
+      {
+        "node": "13",
+        "input": "width"
+      },
+      {
+        "node": "10",
+        "input": "width"
+      },
+      {
+        "node": "17",
+        "input": "width"
+      }
+    ],
+    "height": [
+      {
+        "node": "8",
+        "input": "height"
+      },
+      {
+        "node": "13",
+        "input": "height"
+      },
+      {
+        "node": "10",
+        "input": "height"
+      },
+      {
+        "node": "17",
+        "input": "height"
+      }
+    ],
+    "plate_width": [
+      {
+        "node": "27",
+        "input": "width"
+      }
+    ],
+    "plate_height": [
+      {
+        "node": "27",
+        "input": "height"
+      }
+    ]
+  },
+  "frame_grid": {
+    "step": 17,
+    "offset": 5,
+    "min": 5,
+    "length": [
+      {
+        "node": "17",
+        "input": "length"
+      },
+      {
+        "node": "10",
+        "input": "length"
+      }
+    ],
+    "trim": [
+      {
+        "node": "26",
+        "input": "length"
+      }
+    ],
+    "pad_read": true
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "vfx_edit: ",
+      "targets": [
+        {
+          "node": "9",
+          "input": "text"
+        },
+        {
+          "node": "10",
+          "input": "prompt"
+        }
+      ],
+      "tooltip": "Start with 'vfx_edit:'. One English sentence: the edit, then what must stay unchanged, e.g. 'vfx_edit: Add fire to the man's hands while preserving his identity, pose, motion, clothing, framing, lighting and background.' Don't ask to preserve the area being replaced. With 'first_frame' connected, name it as <Picture 1> and say what it is."
+    },
+    {
+      "name": "lora",
+      "label": "LoRA",
+      "type": "choice",
+      "values": [
+        "minimax_h3_vfx_edit_v1.0_r128.safetensors",
+        "minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors",
+        "minimax_h3_vfx_edit_ffp_v1.0_solar05_dyn99.safetensors"
+      ],
+      "labels": [
+        "Standard (r128)",
+        "FFP (r128)",
+        "FFP + SolarRenderer (experimental)"
+      ],
+      "default": "minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors",
+      "node": "2",
+      "input": "lora_name",
+      "tooltip": "Standard: prompt-only edits (trained 384 px, 73 frames). FFP: trained further at 512 px / 124 frames and can carry an edited first frame through the shot. FFP + SolarRenderer: the FFP LoRA merged with SolarRenderer control at 0.5 (the author's newest first-frame version)."
+    },
+    {
+      "name": "megapixels",
+      "label": "megapixels",
+      "type": "float",
+      "default": 0.7,
+      "min": 0.2,
+      "max": 2.0,
+      "tooltip": "Size H3 works at, with the plate's aspect (multiple of 32); scaled back to plate size after. 0.7 = the author's default. The LoRAs were trained at 384-512 px."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "node": "20",
+      "input": "noise_seed"
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "100", "input": "output_colorspace"}, {"node": "103", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "lora_strength",
+      "label": "LoRA strength",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0,
+      "node": "2",
+      "input": "strength_model",
+      "tooltip": "The author's starting point is 1.0."
+    },
+    {
+      "name": "steps",
+      "label": "steps",
+      "type": "int",
+      "default": 4,
+      "node": "22",
+      "input": "steps",
+      "tooltip": "With the 4-step turbo LoRA."
+    }
+  ]
+}
