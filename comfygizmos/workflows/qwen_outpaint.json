@@ -1,7 +1,7 @@
 {
   "id": "qwen_outpaint",
   "label": "Qwen Outpaint",
-  "description": "Qwen-Image 2.1 + the Outpaint LoRA (ausboss, v2) extends the frame: the plate is padded with flat gray by 'extend' pixels and the gray is filled with a continuation of the scene. Output: the whole extended canvas.",
+  "description": "Qwen-Image 2.1 + the Outpaint LoRA (ausboss, v2) extends the frame: the plate is padded with flat gray out to the 'extend area' box and the gray is filled with a continuation of the scene. Output: the whole extended canvas.",
   "usage": [
     "Extends the frame: new picture added around the plate (Outpaint LoRA).",
     "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
