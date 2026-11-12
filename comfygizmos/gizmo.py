@@ -16,10 +16,10 @@ import uuid
 
 import nuke
 
-from . import client, colorspace
+from . import client, colorspace, models
 
 WORKFLOW_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflows")
-PREFS_FILE = os.path.expanduser("~/.nuke/comfygizmos_prefs.json")
+PREFS_FILE = models.PREFS_FILE
 DEFAULT_PREFS = {
     "host": client.DEFAULT_HOST,
     "output_subpath": "Comp/Inputs/ComfyUI",   # under the shot root (project dir, else one up from the .nk)
@@ -67,27 +67,115 @@ def workflows():
 
 
 def _api_graph(wf):
+    """The workflow's API graph, its model loaders pointed at the files of the tier set in the prefs."""
     with open(os.path.join(WORKFLOW_DIR, wf["api"]), encoding="utf-8") as f:
-        return json.load(f)
+        return models.swap(json.load(f), *models.settings(prefs()))
 
 
 def prefs():
     data = dict(DEFAULT_PREFS)
-    try:
-        with open(PREFS_FILE, encoding="utf-8") as f:
-            data.update(json.load(f))
-    except (OSError, ValueError):
-        pass
+    data.update(models.read_prefs())
     return data
 
 
 def register_menu():
-    """Nodes > ComfyUI > <one entry per workflow>."""
+    """Nodes > ComfyUI > <one entry per workflow picked in the installer (all if none were)>, Check setup."""
     menu = nuke.menu("Nodes").addMenu("ComfyUI")
+    settings = prefs()
     for wf_id, wf in sorted(workflows().items(), key=lambda kv: kv[1]["label"]):
         if wf_id != wf["id"]:                            # an alias of a retired workflow: no menu entry
             continue
+        if not models.is_picked(settings, wf_id):
+            continue
         menu.addCommand(wf["label"], "comfygizmos.create({!r})".format(wf_id))
+    menu.addSeparator()
+    menu.addCommand("Check setup...", "comfygizmos.check_setup()")
+
+
+def _enabled_workflows():
+    settings = prefs()
+    return {i: wf for i, wf in workflows().items() if i == wf["id"] and models.is_picked(settings, i)}
+
+
+def check_setup():
+    """Asks the running ComfyUI what it has and lists, per gizmo, the node packs and model files missing."""
+    host = prefs()["host"]
+    try:
+        info = client._request(host, "/object_info", timeout=60)
+        stats = client._request(host, "/system_stats", timeout=10)
+    except client.ComfyError as e:
+        nuke.message("Check setup:\n\n{}\n\nStart ComfyUI and try again.".format(e))
+        return
+    try:
+        aces_ok = colorspace.to_comfy(DEFAULT_COLORSPACE, client.colorspaces(host)) is not None
+    except client.ComfyError:
+        aces_ok = None                                    # no OCIO Read: reported as a missing pack
+    tier, fp4 = models.settings(prefs())
+    wfs = _enabled_workflows()
+    raw = {}
+    for wf_id, wf in wfs.items():
+        with open(os.path.join(WORKFLOW_DIR, wf["api"]), encoding="utf-8") as f:
+            raw[wf_id] = json.load(f)
+    report = models.check(info, stats, raw, tier, fp4, aces_ok)
+    _show_html("ComfyGizmos - Check setup", _setup_html(report, wfs, tier, fp4))
+
+
+def _setup_html(report, wfs, tier, fp4):
+    esc = lambda s: str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    ok, bad = "<b>ready</b>", "<b>missing</b>"
+    lines = ["<h3>ComfyUI</h3><ul>"]
+    lines.append("<li>Version {} - {}</li>".format(
+        esc(report["version"] or "unknown"),
+        "ok" if report["version_ok"] else "<b>too old: update to {} or newer</b>".format(models.catalog()["min_comfyui"])))
+    if report["gpu"]:
+        adv_tier, adv_fp4 = report["advice"]
+        lines.append("<li>{} ({:.0f} GB). Model size set to <b>{}</b>{}.</li>".format(
+            esc(report["gpu"]), report["vram"] / 1024 ** 3, tier,
+            "" if adv_tier == tier else " - <b>{}</b> suggested for this card".format(adv_tier)))
+        if fp4 and not adv_fp4:
+            lines.append("<li><b>This card isn't RTX 50 series:</b> NVFP4 models will be slow or fail. "
+                         "Run the installer and untick NVFP4.</li>")
+    if report["aces_ok"] is False:
+        lines.append("<li><b>ComfyUI's OCIO config has no ACES2065-1</b>: start ComfyUI with an ACES config "
+                     "in the OCIO environment variable.</li>")
+    lines.append("</ul><h3>Gizmos</h3><table cellspacing='0' cellpadding='3'>")
+    for wf_id, wf in sorted(wfs.items(), key=lambda kv: kv[1]["label"]):
+        r = report["workflows"][wf_id]
+        lines.append("<tr><td valign='top'>{}</td><td valign='top'>{}</td><td>".format(
+            esc(wf["label"]), ok if r["ready"] else bad))
+        for pack in r["packs"]:
+            url = models.catalog()["packs"].get(pack, {}).get("url")
+            lines.append("node pack: {}<br>".format(
+                "<a href='{0}'>{1}</a>".format(url, esc(pack)) if url else esc(pack)))
+        for name in r["models"]:
+            url, page, gated, folder = models.source(name)
+            where = ("<a href='{}'>download</a>{}".format(url, " (gated: accept the licence on the "
+                                                          "<a href='{}'>model page</a> first)".format(page) if gated else "")
+                     if url else "no public link known - get it by hand")
+            lines.append("models/{}/{} {:.1f} GB - {}<br>".format(
+                esc(folder), esc(name), models.file_size(name) / 1e9, where))
+        lines.append("</td></tr>")
+    lines.append("</table>")
+    return "".join(lines)
+
+
+def _show_html(title, html):
+    try:
+        from PySide6 import QtWidgets                     # Nuke 16+
+    except ImportError:
+        from PySide2 import QtWidgets
+    dlg = QtWidgets.QDialog()
+    dlg.setWindowTitle(title)
+    dlg.resize(820, 640)
+    lay = QtWidgets.QVBoxLayout(dlg)
+    text = QtWidgets.QTextBrowser()
+    text.setOpenExternalLinks(True)
+    text.setHtml(html)
+    lay.addWidget(text)
+    close = QtWidgets.QPushButton("Close")
+    close.clicked.connect(dlg.accept)
+    lay.addWidget(close)
+    dlg.exec_() if hasattr(dlg, "exec_") else dlg.exec()
 
 
 # --------------------------------------------------------------------------- building the node
@@ -1194,7 +1282,7 @@ def _prepare(group, mode="render"):
             raise _Abort("colorspace '{}' has no match in ComfyUI's OCIO config - set 'colorspace "
                          "override'".format(nuke_cs))
 
-    refs = _prepare_refs(group, wf, available, src_dir, stem, src_version, first, notes)
+    refs = _prepare_refs(group, wf, available, src_dir, stem, src_version, first, notes, count)
 
     # output colorspace
     out_cs = group["cg_out_cs"].value().strip() if "cg_out_cs" in group.knobs() else ""
@@ -1490,13 +1578,39 @@ def _after_submit_seed(group, notes):
         group["wf_seed"].setValue(seed + 1)
 
 
-def _prepare_refs(group, wf, available, src_dir, stem, src_version, frame, notes):
-    """Reference inputs that are connected -> [(ref spec, path, raw, comfy colorspace, first, last)].
-    A 'range' ref (a video) sends its own frame range, up to its 'max_frames'; the others one frame."""
+def _ref_position(group, ref, first, count):
+    """A 'position' ref's place in the clip sent, as a frame index from its first frame (0 .. count-1).
+    'at': 'last' = the last frame sent; {'knob': name} = that knob's frame number, 0 = the middle."""
+    pos = ref["position"]
+    if pos.get("at") == "last":
+        return count - 1
+    value = int(group["wf_" + pos["knob"]].value()) if "wf_" + pos["knob"] in group.knobs() else 0
+    if value == 0:
+        return (count - 1) // 2
+    idx = value - first
+    if not 0 <= idx < count:
+        raise _Abort("'{}' frame {} is outside the frames sent ({}-{})".format(ref["name"], value, first,
+                                                                             first + count - 1))
+    return idx
+
+
+def _prepare_refs(group, wf, available, src_dir, stem, src_version, frame, notes, count=1):
+    """Reference inputs that are connected -> [(ref spec, path, raw, comfy colorspace, first, last, position)].
+    A 'range' ref (a video) sends its own frame range, up to its 'max_frames'; the others one frame. A
+    'position' ref (a keyframe still) sends the frame at its place in the clip; position = its frame index."""
     refs = []
+    first = frame
     for ref in wf.get("refs", []):
+        position = None
+        frame = first
+        if ref.get("position"):
+            position = _ref_position(group, ref, first, count)
+            frame = first + position
         i = _ref_index(group, ref)
         if i is None or group.input(i) is None:
+            if ref.get("required"):                      # the graph has no fallback for it (a string = what it is)
+                what = ref["required"] if isinstance(ref["required"], str) else "it is required"
+                raise _Abort("connect the '{}' input - {}".format(ref["name"], what))
             continue
         read = _direct_read(group, i)
         if ref.get("range"):
@@ -1525,7 +1639,9 @@ def _prepare_refs(group, wf, available, src_dir, stem, src_version, frame, notes
             cs = colorspace.to_comfy(DEFAULT_COLORSPACE if colorspace.is_default(nuke_cs) else nuke_cs, available)
             if not cs:
                 raise _Abort("{}: colorspace '{}' has no match in ComfyUI's OCIO config".format(ref["name"], nuke_cs))
-        refs.append((ref, path, raw, cs, f, f_last))
+        refs.append((ref, path, raw, cs, f, f_last, position))
+        if position is not None:
+            notes.append("{} at frame {}".format(ref["name"], first + position))
     return refs
 
 
@@ -1533,11 +1649,15 @@ def _add_refs(prompt, wf, refs):
     """One OCIO Read per reference (a copy of the plate's), wired to the ref's targets. A ref 'slot'
     ({node, input with {} for the number, start, tag}) takes the next free numbered input, so the
     connected refs are numbered without gaps - as the model's prompt tags count them. Returns tag notes."""
+    _bypass_refs(prompt, wf, refs)
     if not refs:
         return []
     base = prompt[wf["read"]["node"]]
     used, tags = {}, []
-    for ref, path, raw, cs, f, f_last in refs:
+    for ref, path, raw, cs, f, f_last, position in refs:
+        if position is not None:
+            for t in ref["position"]["targets"]:
+                prompt[t["node"]]["inputs"][t["input"]] = position
         nid = "cg_" + ref["name"]
         node = copy.deepcopy(base)
         node["inputs"].update({"source": path, "frame_mode": _frame_mode(path), "raw_data": raw,
@@ -1569,6 +1689,22 @@ def _add_refs(prompt, wf, refs):
         for t in ref.get("flags", []):                  # switches that turn the ref's branch on
             prompt[t["node"]]["inputs"][t["input"]] = t.get("value", True)
     return ["tags " + ", ".join(tags)] if tags else []
+
+
+def _bypass_refs(prompt, wf, refs):
+    """Manifest ref 'bypass' [{node, outputs: [input name per output]}]: with the ref unconnected, each node is
+    taken out of the graph and whatever used its output k is fed from its input outputs[k] instead."""
+    connected = {r[0]["name"] for r in refs}
+    for ref in wf.get("refs", []):
+        if ref["name"] in connected:
+            continue
+        for spec in ref.get("bypass", []):
+            nid = spec["node"]
+            node = prompt.pop(nid)
+            for other in prompt.values():
+                for key, val in other["inputs"].items():
+                    if isinstance(val, list) and len(val) == 2 and val[0] == nid:
+                        other["inputs"][key] = node["inputs"][spec["outputs"][val[1]]]
 
 
 def _frame_mode(path):

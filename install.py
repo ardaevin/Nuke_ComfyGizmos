@@ -1,4 +1,6 @@
-"""Copy the comfygizmos package into ~/.nuke/python (replacing the previous copy).
+"""Copy the comfygizmos package into ~/.nuke/python (replacing the previous copy) - the manual way.
+Most people should run install.bat / install.command instead: that installer also sets up ComfyUI, the models
+and menu.py.
 
     python install.py [target_dir]
 
@@ -15,6 +17,7 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc")
 
 
 def main(target):
@@ -22,7 +25,7 @@ def main(target):
     dst = os.path.join(target, "comfygizmos")
     if os.path.isdir(dst):
         shutil.rmtree(dst)
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    shutil.copytree(src, dst, ignore=IGNORE)
     print("installed:", dst)
 
 

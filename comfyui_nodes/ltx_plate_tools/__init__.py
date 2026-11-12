@@ -222,3 +222,21 @@ NODE_DISPLAY_NAME_MAPPINGS = {"LTXPlatePrep": "LTX Plate Prep (local)",
                               "VeoVideoFrames": "Veo Video Frames (local)"}
 
 WEB_DIRECTORY = "./web"
+
+
+def _install_placeholder():
+    """LTX Alpha Gen's optional start-image input names this image (it isn't used for the matte): put it in
+    ComfyUI's input folder, so nobody has to copy it there by hand."""
+    import os
+    import shutil
+    try:
+        import folder_paths
+        name = "_ltx_no_image_placeholder.png"
+        dst = os.path.join(folder_paths.get_input_directory(), name)
+        if not os.path.isfile(dst):
+            shutil.copy2(os.path.join(os.path.dirname(os.path.abspath(__file__)), name), dst)
+    except Exception as e:                               # never stop the pack loading over it
+        print("[ltx_plate_tools] could not copy the placeholder image to ComfyUI's input folder:", e)
+
+
+_install_placeholder()

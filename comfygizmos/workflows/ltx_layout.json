@@ -1,0 +1,243 @@
+{
+  "id": "ltx_layout",
+  "label": "LTX Layout to Render",
+  "description": "LTX-2.5 Layout to Render IC-LoRA: turns a clay / playblast layout clip into a finished shot, following its camera and movement and taking the look from an art-directed first frame (and optional mid and last frames). Output: an EXR sequence in ACES2065-1 at the layout's size and frame numbers, no audio.",
+  "usage": [
+    "Turns a layout clip (clay viewport, blocky playblast) into a finished shot (LTX-2.5 Layout to Render, two stages).",
+    "Connect the layout clip to 'layout': it sets the camera and the movement. Whole input range is sent; tick 'input range' to send only first-last.",
+    "Connect the art-directed first frame to 'first' (required): the layout's first frame made into the finished look with any image model. Don't use the grey clay frame itself.",
+    "Only one frame of 'first' is sent: the layout's first frame, or the still itself if it is a single image.",
+    "Optional 'mid' and 'last': art-directed stills that hold the look through the shot. 'last' is placed on the last frame sent, 'mid' at 'mid frame' (0 = the middle). Each sends the frame at its place, or the still itself.",
+    "prompt: one or two sentences describing the finished shot, matching the look. Don't write 'clay', '3D' or 'Unreal'.",
+    "It renders at 544 px short side, then 2x (1088). 'output size' = layout size scales it back to line up with the layout; a 4K layout comes back soft.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "License (checked 2026-11): LTX-2.x Community - commercial use is free under $10M annual revenue (affiliates count); above that needs a paid license. Generated content must be disclosed as machine-generated when distributed."
+  ],
+  "api": "ltx_layout.api.json",
+  "suffix": "LTXRender",
+  "input_name": "layout",
+  "max_frames": 241,
+  "max_frames_input": {
+    "node": "9046",
+    "input": "max_frames",
+    "tooltip": "Longer ranges need more VRAM and RAM."
+  },
+  "read": {
+    "node": "9045"
+  },
+  "write": {
+    "node": "9050"
+  },
+  "refs": [
+    {
+      "name": "first",
+      "required": "the art-directed first frame that sets the look",
+      "targets": [
+        {
+          "node": "9002:9042",
+          "input": "image"
+        },
+        {
+          "node": "9034:9043",
+          "input": "image"
+        }
+      ]
+    },
+    {
+      "name": "mid",
+      "targets": [
+        {
+          "node": "9002:9101",
+          "input": "image"
+        },
+        {
+          "node": "9034:9101",
+          "input": "image"
+        }
+      ],
+      "position": {
+        "knob": "mid_frame",
+        "targets": [
+          {
+            "node": "9002:9101",
+            "input": "frame_idx"
+          },
+          {
+            "node": "9034:9101",
+            "input": "frame_idx"
+          }
+        ]
+      },
+      "bypass": [
+        {
+          "node": "9034:9101",
+          "outputs": [
+            "positive",
+            "negative",
+            "latent"
+          ]
+        },
+        {
+          "node": "9002:9101",
+          "outputs": [
+            "positive",
+            "negative",
+            "latent"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "last",
+      "targets": [
+        {
+          "node": "9002:9102",
+          "input": "image"
+        },
+        {
+          "node": "9034:9102",
+          "input": "image"
+        }
+      ],
+      "position": {
+        "at": "last",
+        "targets": [
+          {
+            "node": "9002:9102",
+            "input": "frame_idx"
+          },
+          {
+            "node": "9034:9102",
+            "input": "frame_idx"
+          }
+        ]
+      },
+      "bypass": [
+        {
+          "node": "9034:9102",
+          "outputs": [
+            "positive",
+            "negative",
+            "latent"
+          ]
+        },
+        {
+          "node": "9002:9102",
+          "outputs": [
+            "positive",
+            "negative",
+            "latent"
+          ]
+        }
+      ]
+    }
+  ],
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "LTX works on display-referred images, so highlights are rolled off or clipped (see the highlights knob)."
+  },
+  "knobs": [
+    {
+      "name": "prompt",
+      "label": "prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "5508",
+      "input": "value",
+      "tooltip": "One or two sentences describing the finished shot, matching the 'first' still. Don't write 'clay', '3D' or 'Unreal'."
+    },
+    {
+      "name": "mid_frame",
+      "label": "mid frame",
+      "type": "int",
+      "default": 0,
+      "tooltip": "Where the 'mid' still is placed: a frame number of the layout. 0 = the middle of the frames sent. Only used when 'mid' is connected."
+    },
+    {
+      "name": "output_size",
+      "label": "output size",
+      "type": "choice",
+      "values": [
+        "plate size",
+        "keep upscale"
+      ],
+      "labels": [
+        "layout size",
+        "keep upscale"
+      ],
+      "default": "plate size",
+      "node": "9049",
+      "input": "output_size",
+      "tooltip": "layout size (default): scaled back to the layout clip's size, so it lines up. keep upscale: the model's own size, 1088 px on the short side."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "default": 42,
+      "targets": [
+        {
+          "node": "5516:4832",
+          "input": "noise_seed"
+        },
+        {
+          "node": "9034:9031",
+          "input": "noise_seed"
+        }
+      ]
+    },
+    {
+      "name": "highlights",
+      "label": "highlights",
+      "type": "choice",
+      "values": [
+        "Utility - sRGB - Texture",
+        "Output - sRGB"
+      ],
+      "labels": [
+        "clip",
+        "roll off"
+      ],
+      "default": "Output - sRGB",
+      "targets": [
+        {
+          "node": "9045",
+          "input": "output_colorspace"
+        },
+        {
+          "node": "9050",
+          "input": "from_colorspace"
+        }
+      ],
+      "tooltip": "roll off (default): the layout and stills go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot (display 0.98 = about 7, 1.0 = about 16). clip: values above 1 reach the model as 1 (colorimetric), shadows stay open."
+    },
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "negative_prompt",
+      "label": "negative prompt",
+      "type": "multiline",
+      "default": "",
+      "node": "5509",
+      "input": "value",
+      "tooltip": "Used as written."
+    },
+    {
+      "name": "lora_strength",
+      "label": "LoRA strength",
+      "type": "float",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0,
+      "node": "5004:5606",
+      "input": "strength_model",
+      "tooltip": "Strength of the Layout to Render IC-LoRA."
+    }
+  ]
+}

@@ -49,6 +49,7 @@ Nano Banana 2 and Pro also do text to image: see above.
 | **Veo 3.1 Reference to Video** | A new clip that keeps the look of up to 3 reference pictures (Vertex AI; paid per render) | from one frame | ACES2065-1, Veo's own size |
 | **LTX 2.5 I2V HDR** | A new HDR clip from one HDR frame (LTX-2.5 Native HDR, two stages) | from one frame | ACES2065-1 |
 | **LTX Refine** | Re-renders a frame range at a bigger output size, with new detail (LTX-2.5 Tiled Fusion + Refine Details IC-LoRA) | range, up to 241 | ACES2065-1, the size you pick |
+| **LTX Layout to Render** | Turns a clay or playblast layout clip into a finished shot, following its camera and movement, with the look from an art-directed first frame and optional mid and last frames (LTX-2.5 Layout to Render IC-LoRA, two stages) | range, up to 241 | ACES2065-1, the layout's size |
 
 **Mattes, HDR and data passes**
 
@@ -84,7 +85,37 @@ before paid work.
 loads and writes through its OCIO Read and OCIO Write, using an ACES 1.2
 config by default.
 
-Per gizmo:
+**ComfyUI v0.41.0 or newer.** Several models' nodes are part of ComfyUI
+itself, so an older ComfyUI reports them as missing custom nodes, for example
+`Node 'Qwen Image 2.1 Cache' not found`. The Flux 3 Klein gizmos need v0.41.0,
+the Qwen gizmos v0.37.0 and the MiniMax H3 gizmos v0.34.0. To fix the error,
+update ComfyUI and restart it; installing a custom node won't help.
+
+**Graphics card.** The installer offers two model sizes:
+
+- **Full**: the models the workflows were built with, for 32 GB cards
+  (RTX 5090).
+- **Medium**: smaller official quantisations of the big models from the same
+  Hugging Face repos, for about 24 GB cards (RTX 4090, 3090): int8 instead of
+  bf16 for LTX-2.5 and its Gemma encoders, w4a8 Qwen encoders and w6a8
+  MiniMax H3 models. Expect a little less detail than Full.
+
+The MiniMax H3 text encoder is NVFP4, which runs fast only on RTX 50 series
+cards; on older cards the installer uses its int8 version instead (bigger, so
+ComfyUI moves part of it to system RAM).
+
+Download size per family, everything ticked:
+
+| Family | Full | Medium |
+|---|---|---|
+| LTX-2.5 | 87 GB | 50 GB |
+| Qwen-Image 2.1 | 44 GB | 36 GB |
+| MiniMax H3 | 88 GB | 78 GB (90 GB on cards older than RTX 50) |
+| Flux 3 Klein | 24 GB | 24 GB |
+| Google (Vertex AI) | none | none |
+| Depth and normals | downloaded by their packs | downloaded by their packs |
+
+Per gizmo (the installer works this out for you; the files are the Full ones):
 
 | Gizmo | Node packs | Models (ComfyUI `models/` folder) |
 |---|---|---|
@@ -93,55 +124,96 @@ Per gizmo:
 | LTX SDR to HDR (Tiled) | ComfyUI-LTXVideo, `ltx_plate_tools` | as above, plus `latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors` |
 | LTX 2.5 I2V HDR | ComfyUI-LTXVideo | the LTX-2.5 transformer, VAEs and text encoders above, plus the x2 latent upscaler |
 | LTX Refine | ComfyUI-LTXVideo, `ltx_plate_tools`, `audio_fallback` (this repo) | the LTX-2.5 transformer, VAEs and text encoders above, `loras/ltx-2.5-22b-ic-lora-refine-details-1.0.safetensors` |
+| LTX Layout to Render | ComfyUI-LTXVideo, `ltx_plate_tools` | the LTX-2.5 transformer, VAEs, Gemma encoder and x2 latent upscaler above, `loras/ltx-2.5-22b-ic-lora-layout-to-render-1.0.safetensors` |
 | Qwen Image Edit | `ltx_plate_tools` | `diffusion_models/qwen_image_2.1_int8_convrot.safetensors`, `vae/qwen_image_2.1_vae_bf16.safetensors`, `text_encoders/qwen3vl_8b_int8_convrot.safetensors`, `text_encoders/qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors` (prompt enhancer) |
 | Qwen Image Edit (Turbo) | `ltx_plate_tools` | as above, with `diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors` |
 | Qwen Text to Image (+ Turbo) | none beyond ComfyUI-OCIO | the Qwen-Image 2.1 (or Turbo) model, VAE and `qwen3vl_8b` encoder above, with the text-to-image enhancer `text_encoders/qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors` |
 | Qwen Outpaint | `ltx_plate_tools` | the Qwen-Image 2.1 model, VAE and `qwen3vl_8b` encoder, `loras/qwen-image-2.1-outpaint-v2.safetensors` |
 | Qwen Remove Background | `ltx_plate_tools` | as Outpaint, with `loras/qwen-image-2.1-consistency.safetensors` |
-| Qwen Light Blend | `ltx_plate_tools` | as Outpaint, with `loras/Qwenimag21_c2-st2000.safetensors` |
+| Qwen Light Blend | `ltx_plate_tools` | as Outpaint, with `loras/Qwenimag21_c2-st2000.safetensors` from [RunningHubAI](https://huggingface.co/RunningHubAI/rh-qwen-image-2.1-lora-2104918997757157378) |
 | Qwen Outfit Swap | `ltx_plate_tools` | as Outpaint, with `loras/qwen-image-2.1-outfit-swap.safetensors` |
 | MiniMax H3 Image to Video | [MiniMax-H3-Prompt-Rewriter-ComfyUI](https://github.com/pytraveler/MiniMax-H3-Prompt-Rewriter-ComfyUI) (prompt enhancer; the H3 nodes are part of ComfyUI) | `unet/minimax_h3_fl2va_pruned_int8_convrot.safetensors`, `loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors`, `vae/minimax_h3_video_vae_int8_convrot.safetensors`, `clip/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` |
 | MiniMax FastH3 Image to Video | MiniMax-H3-Prompt-Rewriter-ComfyUI | `diffusion_models/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors`, plus the H3 VAE and encoder above |
 | MiniMax H3 Reference to Video | MiniMax-H3-Prompt-Rewriter-ComfyUI | `unet/minimax_h3_ref2va_pruned_int8_convrot.safetensors`, `loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors`, plus the H3 VAE and encoder above |
-| MiniMax H3 VFX Edit | none beyond ComfyUI-OCIO | the Reference to Video model and turbo LoRA above, `vae/minimax_h3_audio_vae_fp32.safetensors`, and the VFX Edit LoRAs (`loras/minimax_h3_vfx_edit_*.safetensors`) |
+| MiniMax H3 VFX Edit | none beyond ComfyUI-OCIO | the Reference to Video model and turbo LoRA above, `vae/minimax_h3_audio_vae_fp32.safetensors`, and `loras/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors` from [Alissonerdx/Minimax-H3-ComfyUI](https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI) |
 | DSINE Normals | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) | DSINE (downloaded by the pack on first use) |
 | VDA Depth | [ComfyUI-Video-Depth-Anything](https://github.com/yuvraj108c/ComfyUI-Video-Depth-Anything) | `videodepthanything/video_depth_anything_vitl.pth` (downloaded by the pack on first use) |
 | Flux 3 Klein Edit | `ltx_plate_tools` (the Flux nodes are part of ComfyUI) | `diffusion_models/flux3_image_klein_base_int8_convrot.safetensors`, `vae/flux2-vae.safetensors`, `text_encoders/qwen3vl_4b_int8_convrot.safetensors`, `text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors` (prompt upsampler), from [black-forest-labs/flux-3-image-klein-comfy](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy) |
 | Flux 3 Klein Edit (Distilled) | `ltx_plate_tools` | as above, with `diffusion_models/flux3_image_klein_sd_int8_convrot.safetensors` |
 | Nano Banana 2, Nano Banana Pro, Veo 3.1 (both), Gemini 3.1 Pro | [comfyui-google-genmedia-custom-nodes](https://github.com/GoogleCloudPlatform/comfyui-google-genmedia-custom-nodes), `ltx_plate_tools` | none local: they call Vertex AI. You need a Google Cloud project with Vertex AI enabled, signed in with `gcloud auth application-default login` |
 
-The Lightricks repos on Hugging Face are gated, so accept the licence first.
-ComfyUI only lists `embeddings/` at startup, so restart it after adding the
-scene embedding.
+The Lightricks (LTX-2.5) and Flux 3 Klein repos on Hugging Face are gated:
+accept their licence on the model page while signed in, and give the installer
+a [Hugging Face token](https://huggingface.co/settings/tokens). ComfyUI only
+lists `embeddings/` at startup, so restart it after adding the scene
+embedding.
 
 ## Install
 
-1. **ComfyUI side**
-   - Copy `comfyui_nodes/ltx_plate_tools` and `comfyui_nodes/audio_fallback`
-     into `ComfyUI/custom_nodes/`.
-   - Copy `comfyui_nodes/_ltx_no_image_placeholder.png` into `ComfyUI/input/`.
-     LTX Alpha Gen's optional start-image input needs it; the image isn't
-     used for the matte.
-   - `ltx_plate_tools` holds Plate Prep and Plate Restore (fit, pad and scale
-     back to the plate) and Plate Aspect Pad, which pads a plate to the
-     nearest aspect ratio Nano Banana accepts instead of stretching it, and Veo
-     Video Frames, which turns Veo's clip into frames.
-     `audio_fallback` gives LTX Refine a silent audio track, since plates have
-     none.
-   - Restart ComfyUI.
-2. **Nuke side**
-   - Run `python install.py`. It copies `comfygizmos` to `~/.nuke/python/`,
-     or pass another folder on your Nuke plugin path.
-   - Add to `menu.py`:
+1. Download this repo (**Code > Download ZIP**, or `git clone`) and unzip it.
+2. Double-click **`install.bat`** (Windows) or **`install.command`** (macOS,
+   Linux). It opens the installer with the Python inside Nuke, so you don't
+   need your own Python. It uses the newest Nuke it finds; to pick one, run
+   `install.bat "C:\Program Files\Nuke15.1v5\python.exe"`.
+3. In the installer:
+   - Check the **ComfyUI folder** (the one with `custom_nodes` and `models`)
+     and **ComfyUI's Python**. Both are found for you when ComfyUI is running
+     or in a usual place. It warns if ComfyUI is too old.
+   - Pick the **model size**. It suggests one from your graphics card.
+   - Untick the gizmos you don't want. Each line shows what it is missing and
+     its download size, with the total at the bottom (files shared by several
+     gizmos counted once).
+   - For gated models, paste a Hugging Face token. It isn't saved.
+   - Press **Install**.
+4. Restart ComfyUI and Nuke, then run **Nodes > ComfyUI > Check setup...**.
 
-     ```python
-     try:
-         import comfygizmos
-         comfygizmos.register_menu()   # Nodes > ComfyUI > one entry per workflow
-     except Exception as _err:
-         nuke.tprint('comfygizmos failed to load: %s' % _err)
-     ```
-   - Restart Nuke.
+The installer:
+
+- copies this repo's two ComfyUI node packs into `custom_nodes`:
+  `ltx_plate_tools` (Plate Prep and Restore, Plate Aspect Pad and Veo Video
+  Frames) and `audio_fallback` (the silent audio track LTX Refine needs);
+- clones the other node packs the ticked gizmos need and installs their
+  Python requirements with ComfyUI's own Python (uses `git` if you have it,
+  else downloads the zip);
+- downloads the missing models from Hugging Face into ComfyUI's `models`
+  folders, under the file names the workflows use. Files you already have, in
+  any sub-folder, are skipped, and a cancelled download carries on where it
+  stopped next time;
+- copies the gizmos to `~/.nuke/python` (or the folder you pick) and adds
+  the lines that load them to `~/.nuke/menu.py`, after backing it up. Run it
+  again to update: it replaces its own lines;
+- saves the model size and the ticked gizmos in
+  `~/.nuke/comfygizmos_prefs.json`. Only the ticked gizmos appear in the menu.
+
+To update, download the repo again and run the installer again. Gizmos added
+since your last install are marked new and ticked; only what is missing is
+downloaded, and the gizmos and their `menu.py` lines are replaced, not
+doubled. Node packs you already have aren't updated: update those with
+ComfyUI-Manager or `git pull`. Run it again any time to add gizmos or change
+the model size. Unticking a gizmo hides it from the menu but never deletes
+models.
+
+**Check setup** asks the running ComfyUI what it has, and lists for each
+gizmo the node packs and model files still missing, with download links. It
+also flags a ComfyUI that is too old, an OCIO config without ACES, and NVFP4
+models on a card older than RTX 50.
+
+**By hand**, without the installer:
+
+1. Copy `comfyui_nodes/ltx_plate_tools` and `comfyui_nodes/audio_fallback`
+   into `ComfyUI/custom_nodes/`, install the node packs and models in the
+   Requirements table, and restart ComfyUI.
+2. Run `python install.py`. It copies `comfygizmos` to `~/.nuke/python/`, or
+   pass another folder on your Nuke plugin path.
+3. Add to `menu.py`, then restart Nuke:
+
+   ```python
+   try:
+       import comfygizmos
+       comfygizmos.register_menu()   # Nodes > ComfyUI > one entry per workflow
+   except Exception as _err:
+       nuke.tprint('comfygizmos failed to load: %s' % _err)
+   ```
 
 After an update, existing nodes in a script keep working only if the
 workflow's knobs haven't changed; if a render reports a missing knob, make a
@@ -306,6 +378,18 @@ Either way, comp the result back over the plate only where it changed.
   memory). The prompt is optional and should describe only look and style:
   named objects or people can stamp into every tile. Detail is generated, so
   faces, text and fine patterns can drift; check it against the plate.
+- **LTX Layout to Render**: connect the layout clip to **layout** (it sets
+  the camera and the movement) and the art-directed first frame to **first**
+  (required): the layout's first frame made into the finished look with any
+  image model, not the grey clay frame itself. Optional **mid** and **last**
+  stills hold the look through the shot: **last** goes on the last frame
+  sent, **mid** at **mid frame** (0 = the middle). Each still sends the
+  layout frame at its place, or the still itself. The **prompt** describes
+  the finished shot in a sentence or two; don't write "clay", "3D" or
+  "Unreal". It renders at 544 px on the short side, then x2; **output size**
+  scales it back to the layout's size. The mid and last frames use LTX's
+  keyframe guide in both stages; Lightricks doesn't publish a ComfyUI recipe
+  for them.
 - **Qwen Image Edit / Turbo**:
   - **prompt** is the edit instruction. The plate is `<image1>`; the refs are
     `<image2>`-`<image4>`.
@@ -432,6 +516,18 @@ rather than in the repo:
 `knob_defaults` sets the starting value of any knob, per workflow id, on newly
 created nodes.
 
+The installer adds three more keys; without them every gizmo is shown and the
+Full models are used:
+
+- `"tier"`: `"full"` or `"medium"`, the model size. The gizmos point their
+  model loaders at that size's files when they render.
+- `"fp4"`: `false` swaps NVFP4 models for their int8 versions (cards older
+  than RTX 50).
+- `"gizmos"`: the workflow ids shown in **Nodes > ComfyUI**.
+- `"known"`: every workflow there was when the installer ran. Gizmos added
+  in a later update are shown, and ticked and marked new in the installer,
+  until you untick them.
+
 ## Adding a workflow
 
 1. Build it in ComfyUI with an **OCIO Read** in and an **OCIO Write** out.
@@ -469,7 +565,17 @@ created nodes.
      ({`remove`, `unlink`, `set`, `write_images`}): the graph changes that
      turn it into text to image when no plate is connected, as on Nano Banana.
    - optional `default_name`: the Name a new node starts with.
-5. Run `python install.py` and restart Nuke.
+   - in `refs`, a ref can be `required` (`true`, or a sentence saying what
+     to connect), sit at a `position` in the clip (`{"at": "last"}` or
+     `{"knob": name}`, with `targets` for the frame index), and `bypass` its
+     guide nodes when nothing is connected (`[{node, outputs}]`), as on LTX
+     Layout to Render.
+5. If the graph loads a model file that isn't in the catalog yet, add it to
+   `SOURCES` in `tools/make_catalog.py` (and its smaller version to `MEDIUM`,
+   if there is one), then run `python tools/make_catalog.py`. It reads sizes
+   from Hugging Face and stops if any workflow loads a file it doesn't know.
+   A new custom node goes in `PACKS`, and the gizmo in a `FAMILIES` group.
+6. Run `python install.py` (or the installer) and restart Nuke.
 
 ## Tests
 
@@ -482,7 +588,7 @@ because Nuke reads bare numbers as a frame range.
   versions.
 - `nuke_test.py`, `nuke_test_workflow.py`, `nuke_test_qwen.py`,
   `nuke_test_normals.py`: end-to-end per gizmo. The gizmos added since
-  (text to image, Outpaint, the video gizmos, VDA Depth, LTX Refine and I2V
-  HDR) have no tests yet, and the Google gizmos have none because every run
+  (text to image, Outpaint, the video gizmos, VDA Depth, LTX Refine, LTX
+  Layout to Render and I2V HDR) have no tests yet, and the Google gizmos have none because every run
   is a paid API call.
 - `test_colorspace.py`: colorspace name matching against the live ComfyUI.
