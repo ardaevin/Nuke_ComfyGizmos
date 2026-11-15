@@ -27,6 +27,7 @@ DEFAULT_PREFS = {
 MOVIE_EXT = {"mov", "mp4", "m4v", "avi", "mkv", "webm", "mxf"}
 FRAME_TOKEN = re.compile(r"%0?\d*d|#+|@+")
 POLL_SECONDS = 2.0
+MAX_PATH = 259             # longest file path Nuke can open on Windows (no long-path support)
 NO_CONTACT_SECONDS = 300   # keep trying this long when ComfyUI doesn't answer (it can be too busy to reply)
 # Output root knob text that stands for the evaluated project directory.
 PROJECT_TOKEN = "[value root.project_directory]"
@@ -1316,6 +1317,9 @@ def _prepare(group, mode="render"):
     prompt = _fill_graph(wf, group, src_path, raw, comfy_cs, first, last, out_dir, out_name, out_cs, out_raw,
                          single)
     notes += _add_refs(prompt, wf, refs)
+    view_note = _apply_output_views(prompt, available, host)
+    if view_note:
+        notes.append(view_note)
     _ocio_inputs(prompt, available)
     extend_note, extend_offset = _apply_extend(prompt, wf, group)
     if extend_note:
@@ -1379,6 +1383,10 @@ def _prepare(group, mode="render"):
     first_file = client.write_first_path(host, prompt[wf["write"]["node"]]["inputs"])
     result = re.sub(r"\.(\d+)(\.[^./]+)$", lambda m: ".%0{}d{}".format(len(m.group(1)), m.group(2)),
                     first_file)
+    if os.name == "nt" and len(os.path.abspath(first_file)) > MAX_PATH:
+        # ComfyUI writes it, but Nuke (and its Python) can't open a path this long: it would look missing
+        raise _Abort("the output path is {} characters, over Windows' {} - use a shorter Name or a shorter "
+                     "project folder: {}".format(len(os.path.abspath(first_file)), MAX_PATH, first_file))
     existing = os.path.isfile(first_file)
     if existing and nuke.GUI and not nuke.ask(
             "The OUTPUT of this version already exists:\n{}\n\nOverwrite it?\n\n"
@@ -1817,6 +1825,59 @@ def _render_source(group, path, frames, write_name="SourceWrite"):
             start = prev = f
     finally:
         write["disable"].setValue(True)
+
+
+def _apply_output_views(prompt, available, host):
+    """Highlights 'roll off' asks for ACES 1.x 'Output - sRGB', which includes the ACES output transform. ACES 1.3 /
+    2.0 configs have that transform only as a display + view, and a plain conversion to their display colorspace
+    isn't tone-mapped, so 'roll off' would act like 'clip'. There, each such OCIO Read gets an OCIO Display after
+    it (forward) and the OCIO Write one before it (inverse), with the Read / Write on ACES2065-1 instead.
+    Returns a status note, or ''. Under ACES 1.x nothing changes."""
+    def wanted(node):
+        ins = node.get("inputs", {})
+        if node.get("class_type") == "OCIORead":
+            key = "output_colorspace"
+        elif node.get("class_type") == "OCIOWrite":
+            key = "from_colorspace" if "from_colorspace" in ins else "input_colorspace"
+        else:
+            return None
+        val = ins.get(key)
+        return val if isinstance(val, str) and ins.get("raw_data") is not True else None
+
+    names = {nid: wanted(n) for nid, n in prompt.items()}
+    names = {nid: v for nid, v in names.items() if v and colorspace.is_output_name(v)}
+    if not names:
+        return ""
+    available = available or client.colorspaces(host)          # nothing was sent: the list wasn't fetched
+    displays, views = client.display_views(host)
+    scene = "ACES - ACES2065-1"                                 # mapped to the config's own name afterwards
+    used = set()
+    for nid, val in names.items():
+        found = colorspace.output_view(val, available, displays, views)
+        if not found:
+            continue                                            # 1.x config, or no OCIO Display / view to use
+        display, view = found
+        ins = prompt[nid]["inputs"]
+        vid = "cg_view_" + nid
+        if prompt[nid]["class_type"] == "OCIORead":
+            for other in prompt.values():                        # whatever took the Read's image takes the view's
+                for key, src in other.get("inputs", {}).items():
+                    if isinstance(src, list) and len(src) == 2 and src[0] == nid and src[1] == 0:
+                        other["inputs"][key] = [vid, 0]
+            ins["output_colorspace"] = scene
+            prompt[vid] = {"class_type": "OCIODisplay", "_meta": {"title": "Highlights roll-off ({})".format(view)},
+                           "inputs": {"image": [nid, 0], "in_colorspace": scene, "display": display, "view": view,
+                                      "invert_direction": False, "mix": 1.0}}
+        else:
+            if not isinstance(ins.get("images"), list):
+                continue
+            prompt[vid] = {"class_type": "OCIODisplay", "_meta": {"title": "Highlights roll-off back ({})".format(view)},
+                           "inputs": {"image": ins["images"], "in_colorspace": scene, "display": display,
+                                      "view": view, "invert_direction": True, "mix": 1.0}}
+            ins["images"] = [vid, 0]
+            ins["from_colorspace"] = ins["input_colorspace"] = scene
+        used.add(view)
+    return "highlights rolled off with the {} view".format(" / ".join(sorted(used))) if used else ""
 
 
 def _ocio_inputs(prompt, available):

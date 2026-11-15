@@ -293,14 +293,20 @@ Output frames keep the plate's frame numbers. Gizmos that make a new clip
 number it from the frame that was sent; the Qwen Text to Image gizmos write
 frame 1 and hold it on every frame. The colorspace tag in the file name comes from OCIO Write.
 
+On Windows, Nuke can't open a file path longer than 259 characters, even
+though ComfyUI can write one. A deep project folder plus a long Name can
+reach that, so the gizmo stops before rendering and says so: use a shorter
+Name or project folder.
+
 ### Highlights
 
 Most of the models work on display-referred 0-1 images, so scene-linear
 values above 1 can't go through them unchanged. Every gizmo that sends an
 image to such a model has a **highlights** menu:
 
-- **roll off**: the image goes in through the inverse of ACES `Output - sRGB`
-  and comes back through it, so highlights are compressed rather than cut.
+- **roll off**: the image goes in through the ACES output transform for sRGB
+  and comes back through its inverse, so highlights are compressed rather
+  than cut.
   They return approximately, saturated colours shift, deep shadows are
   crushed (below about 0.003 scene-linear they come back flat) and new
   near-whites come back hot (display 0.98 is about 7, 1.0 is about 16).
@@ -311,6 +317,19 @@ It defaults to **roll off** on the image and video gizmos, and to **clip** on
 DSINE Normals, VDA Depth and LTX Alpha Gen, where it only sets what the
 model sees. The LTX HDR gizmos have no menu, since they work in scene-linear.
 On Gemini 3.1 Pro it only applies to what is sent.
+
+How **roll off** is done depends on ComfyUI's OCIO config:
+
+- **ACES 1.x** (1.2 by default): through the config's `Output - sRGB`
+  colorspace.
+- **ACES 1.3 / 2.0**: these configs have the output transform only as a
+  display view, so the gizmo adds an **OCIO Display** node after each OCIO
+  Read and an inverse one before the OCIO Write, and the status line names
+  the view. The ACES 1.3 configs' `ACES 1.0 - SDR Video` view gives the same
+  result as ACES 1.2. The ACES 2.0 configs only have their own
+  `ACES 2.0 - SDR 100 nits (Rec.709)` view: highlights roll off a little
+  more, and new near-whites come back much hotter (display 0.98 is about 20,
+  1.0 about 128).
 
 Either way, comp the result back over the plate only where it changed.
 

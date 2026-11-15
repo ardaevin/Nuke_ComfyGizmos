@@ -70,6 +70,15 @@ def colorspaces(host):
         raise ComfyError("ComfyUI has no OCIO Read node - is ComfyUI-OCIO installed?")
 
 
+def display_views(host):
+    """(displays, views) ComfyUI-OCIO's OCIO Display accepts, or ([], []) without that node."""
+    try:
+        req = _request(host, "/object_info/OCIODisplay")["OCIODisplay"]["input"]["required"]
+        return list(req["display"][0]), list(req["view"][0])
+    except (ComfyError, KeyError, TypeError, IndexError):
+        return [], []
+
+
 def write_first_path(host, params):
     """The first file OCIO Write will create for these Write inputs (ComfyUI-OCIO's own naming)."""
     keys = ("output_folder", "filename", "container", "still_format", "video_codec", "output_colorspace",

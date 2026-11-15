@@ -149,3 +149,32 @@ def to_comfy(nuke_name, available):
                 hits += [a for a in available if _norm(a) in target_norms]
                 break
     return _best(hits)
+
+
+# ACES 1.x 'Output - <display>' colorspaces are the ACES output transform (with its highlight roll-off). ACES 1.3 /
+# 2.0 configs have that transform only as a display + view; a plain colorspace conversion to their display
+# colorspace is un-tone-mapped. Display, then its views in order of preference: the ACES 1.0 view matches the
+# ACES 1.x 'Output - ...' colorspaces exactly; ACES 2.0 configs only have their own (harder-rolling) curve.
+_OUTPUT_VIEWS = {
+    "Output - sRGB": ("sRGB - Display", ("ACES 1.0 - SDR Video", "ACES 2.0 - SDR 100 nits (Rec.709)")),
+    "Output - Rec.709": ("Rec.1886 Rec.709 - Display", ("ACES 1.0 - SDR Video", "ACES 2.0 - SDR 100 nits (Rec.709)")),
+}
+
+
+def is_output_name(name):
+    """An ACES 1.x 'Output - <display>' name (the highlights 'roll off' value)."""
+    return any(_norm(k) == _norm(unwrap_default(name)) for k in _OUTPUT_VIEWS)
+
+
+def output_view(name, available, displays, views):
+    """For an ACES 1.x 'Output - ...' name that ComfyUI's config doesn't have as a colorspace: the (display, view)
+    of OCIO Display that does the same. None when the name isn't one, the config has it, or no view fits."""
+    name = unwrap_default(name)
+    key = next((k for k in _OUTPUT_VIEWS if _norm(k) == _norm(name)), None)
+    if not key or key in available:
+        return None
+    display, preferred = _OUTPUT_VIEWS[key]
+    if display not in (displays or []):
+        return None
+    view = next((v for v in preferred if v in (views or [])), None)
+    return (display, view) if view else None
