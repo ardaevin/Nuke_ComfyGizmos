@@ -59,6 +59,11 @@ _GROUPS = [
     ("Linear Rec.709 (sRGB)", "lin_rec709_srgb", "lin_rec709", "lin_rec709_scene", "lin_srgb",
      "Utility - Linear - sRGB", "Utility - Linear - Rec.709"),
     ("Raw", "Utility - Raw", "none"),
+    # display-referred: ACES 1.x 'Output - ...' include the ACES output transform (highlight roll-off). The OCIO 2
+    # configs' display colorspaces are the right counterpart by name, but a plain colorspace conversion to them
+    # uses default_view_transform ('Un-tone-mapped' in the ACES 1.3 / 2.0 studio configs): no roll-off there
+    ("sRGB - Display", "srgb_display", "srgb_rec709_display", "Output - sRGB", "out_srgb"),
+    ("Rec.1886 Rec.709 - Display", "rec1886_rec709_display", "g24_rec709_display", "Output - Rec.709", "out_rec709"),
 ]
 
 # (token found in the name, a member of the group it means) - most specific first; for names in no group
