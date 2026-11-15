@@ -14,6 +14,13 @@ if not defined PY (
   pause
   exit /b 1
 )
+if not exist "%PY%" (
+  echo Python not found: "%PY%"
+  pause
+  exit /b 1
+)
 echo Starting the ComfyGizmos installer with %PY%
 "%PY%" "%~dp0installer\run.py"
-if errorlevel 1 pause
+set "RC=%errorlevel%"
+if not "%RC%"=="0" pause
+exit /b %RC%

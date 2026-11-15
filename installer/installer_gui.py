@@ -350,10 +350,13 @@ class Installer(QtWidgets.QWidget):
 
 
 def main():
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+    app = QtWidgets.QApplication.instance()
+    own_app = app is None                                # inside Nuke a QApplication already runs: don't block it
+    if own_app:
+        app = QtWidgets.QApplication(sys.argv)
     win = Installer()
     win.show()
-    if __name__ == "__main__":
+    if own_app:
         sys.exit(app.exec_() if hasattr(app, "exec_") else app.exec())
 
 
