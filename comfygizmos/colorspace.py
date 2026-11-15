@@ -1,30 +1,103 @@
-"""Nuke colorspace name -> the name ComfyUI-OCIO knows.
+"""Colorspace name in one OCIO config -> the same colorspace's name in another.
 
-Exact or punctuation-insensitive matches win. Otherwise a few well-known
-spaces are recognised by their core token, so ACES 1.3 / 2.0 names and the
-nuke-default config ("linear", "sRGB", "rec709") still land on the right
-ACES 1.2 name."""
+Works across ACES 1.0-1.2 ("ACES - ACEScg", "Utility - sRGB - Texture"), ACES 1.3 / 2.0 (the OCIO studio and cg
+configs: "ACEScg", "sRGB Encoded Rec.709 (sRGB)") and nuke-default ("linear", "sRGB", "rec709"), in either
+direction - Nuke and ComfyUI may run different configs. Exact or punctuation-insensitive matches win, then the
+alias groups below, then a few well-known spaces recognised by their core token."""
 import re
 
-# (token found in the Nuke name, token to look for in ComfyUI's names) - most specific first
+# Equivalent names: each OCIO 2 studio-config colorspace with its aliases, which include the ACES 1.x names.
+# Taken from studio-config-latest and Nuke 17's studio configs v2.2.0 (ACES 1.3) and v3.0.0 (ACES 2.0).
+_GROUPS = [
+    ("ACES2065-1", "aces2065_1", "aces", "ACES - ACES2065-1", "lin_ap0", "lin_ap0_scene"),
+    ("ACEScc", "ACES - ACEScc", "acescc_ap1"),
+    ("ACEScct", "ACES - ACEScct", "acescct_ap1"),
+    ("ACEScg", "ACES - ACEScg", "lin_ap1", "lin_ap1_scene"),
+    ("ADX10", "Input - ADX - ADX10"),
+    ("ADX16", "Input - ADX - ADX16"),
+    ("ARRI LogC3 (EI800)", "arri_logc3_ei800", "logc3ei800_alexawide", "Input - ARRI - V3 LogC (EI800) - Wide Gamut",
+     "AlexaV3LogC"),
+    ("Linear ARRI Wide Gamut 3", "lin_arri_wide_gamut_3", "lin_alexawide", "Input - ARRI - Linear - ALEXA Wide Gamut"),
+    ("ARRI LogC4", "arri_logc4", "ARRILogC4"),
+    ("Linear ARRI Wide Gamut 4", "lin_arri_wide_gamut_4", "lin_awg4"),
+    ("CanonLog2 CinemaGamut D55", "canonlog2_cinemagamut_d55", "canonlog2_cgamutday",
+     "Input - Canon - Canon-Log2 - Cinema Gamut Daylight"),
+    ("CanonLog3 CinemaGamut D55", "canonlog3_cinemagamut_d55", "canonlog3_cgamutday",
+     "Input - Canon - Canon-Log3 - Cinema Gamut Daylight"),
+    ("Linear CinemaGamut D55", "lin_cinemagamut_d55", "lin_canoncgamutday",
+     "Input - Canon - Linear - Canon Cinema Gamut Daylight"),
+    ("V-Log V-Gamut", "vlog_vgamut", "Input - Panasonic - V-Log - V-Gamut"),
+    ("Linear V-Gamut", "lin_vgamut", "Input - Panasonic - Linear - V-Gamut"),
+    ("Log3G10 REDWideGamutRGB", "log3g10_redwidegamutrgb", "rl3g10_rwg", "Input - RED - REDLog3G10 - REDWideGamutRGB",
+     "Log3G10"),
+    ("Linear REDWideGamutRGB", "lin_redwidegamutrgb", "lin_rwg", "Input - RED - Linear - REDWideGamutRGB"),
+    ("S-Log3 S-Gamut3", "slog3_sgamut3", "Input - Sony - S-Log3 - S-Gamut3", "SLog3"),
+    ("S-Log3 S-Gamut3.Cine", "slog3_sgamut3cine", "slog3_sgamutcine", "Input - Sony - S-Log3 - S-Gamut3.Cine"),
+    ("S-Log3 Venice S-Gamut3", "slog3_venice_sgamut3", "Input - Sony - S-Log3 - Venice S-Gamut3"),
+    ("S-Log3 Venice S-Gamut3.Cine", "slog3_venice_sgamut3cine", "slog3_venice_sgamutcine",
+     "Input - Sony - S-Log3 - Venice S-Gamut3.Cine"),
+    ("Linear S-Gamut3", "lin_sgamut3", "Input - Sony - Linear - S-Gamut3"),
+    ("Linear S-Gamut3.Cine", "lin_sgamut3cine", "Input - Sony - Linear - S-Gamut3.Cine"),
+    ("Linear Venice S-Gamut3", "lin_venice_sgamut3", "Input - Sony - Linear - Venice S-Gamut3"),
+    ("Linear Venice S-Gamut3.Cine", "lin_venice_sgamut3cine", "Input - Sony - Linear - Venice S-Gamut3.Cine"),
+    ("sRGB Encoded Rec.709 (sRGB)", "srgb_encoded_rec709_srgb", "srgb_texture", "srgb_rec709_scene",
+     "Utility - sRGB - Texture", "Input - Generic - sRGB - Texture", "sRGB - Texture", "srgb_tx"),
+    ("Gamma 1.8 Encoded Rec.709", "g18_encoded_rec709", "g18_rec709", "Utility - Gamma 1.8 - Rec.709 - Texture",
+     "Gamma 1.8 Rec.709 - Texture", "g18_rec709_tx", "g18_rec709_scene", "Gamma1.8"),
+    ("Gamma 2.2 Encoded Rec.709", "g22_encoded_rec709", "g22_rec709", "Utility - Gamma 2.2 - Rec.709 - Texture",
+     "Gamma 2.2 Rec.709 - Texture", "g22_rec709_tx", "g22_rec709_scene", "Gamma2.2"),
+    ("Gamma 2.4 Encoded Rec.709", "g24_encoded_rec709", "g24_rec709", "rec709_display", "Utility - Rec.709 - Display",
+     "Gamma 2.4 Rec.709 - Texture", "g24_rec709_tx", "g24_rec709_scene", "Gamma2.4"),
+    ("Camera Rec.709", "camera_rec709", "rec709_camera", "Utility - Rec.709 - Camera"),
+    ("sRGB Encoded P3-D65", "srgb_encoded_p3d65", "srgb_p3d65", "srgb_displayp3", "srgb_p3d65_scene",
+     "sRGB Encoded P3-D65 - Texture", "srgb_encoded_p3d65_tx"),
+    ("sRGB Encoded AP1", "srgb_encoded_ap1", "srgb_ap1", "srgb_ap1_scene", "sRGB Encoded AP1 - Texture",
+     "srgb_encoded_ap1_tx"),
+    ("Linear AdobeRGB", "lin_adobergb", "lin_adobergb_scene", "Utility - Linear - Adobe RGB"),
+    ("Linear P3-D65", "lin_p3d65", "lin_displayp3", "lin_p3d65_scene", "Utility - Linear - P3-D65", "Linear Display P3"),
+    ("Linear Rec.2020", "lin_rec2020", "lin_rec2020_scene", "Utility - Linear - Rec.2020"),
+    ("Linear Rec.709 (sRGB)", "lin_rec709_srgb", "lin_rec709", "lin_rec709_scene", "lin_srgb",
+     "Utility - Linear - sRGB", "Utility - Linear - Rec.709"),
+    ("Raw", "Utility - Raw", "none"),
+]
+
+# (token found in the name, a member of the group it means) - most specific first; for names in no group
 _ALIASES = [
-    ("acescct", "acescct"),
-    ("acescc", "acescc"),
-    ("acescg", "acescg"),
-    ("aces2065", "aces2065"),
-    ("srgbtexture", "srgbtexture"),
-    ("srgbencodedrec709", "srgbtexture"),
-    ("linearrec709", "linearsrgb"),
-    ("linearsrgb", "linearsrgb"),
-    ("scenelinear", "linearsrgb"),    # nuke-default's scene_linear role
-    ("linear", "linearsrgb"),         # nuke-default "linear" = linear Rec.709 primaries
-    ("rec709", "rec709camera"),       # nuke-default "rec709" = Rec.709 OETF
-    ("srgb", "srgbtexture"),          # nuke-default "sRGB"
+    ("acescct", "ACEScct"),
+    ("acescc", "ACEScc"),
+    ("acescg", "ACEScg"),
+    ("aces2065", "ACES2065-1"),
+    ("srgbtexture", "sRGB - Texture"),
+    ("srgbencodedrec709", "sRGB - Texture"),
+    ("linearrec709", "Linear Rec.709 (sRGB)"),
+    ("linearsrgb", "Linear Rec.709 (sRGB)"),
+    ("scenelinear", "Linear Rec.709 (sRGB)"),   # nuke-default's scene_linear role
+    ("linear", "Linear Rec.709 (sRGB)"),        # nuke-default "linear" = linear Rec.709 primaries
+    ("rec709", "Camera Rec.709"),               # nuke-default "rec709" = Rec.709 OETF
+    ("srgb", "sRGB - Texture"),                 # nuke-default "sRGB"
 ]
 
 
 def _norm(name):
     return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+
+_GROUPS_NORM = [(g, {_norm(x) for x in g}) for g in _GROUPS]
+
+
+def _group(name):
+    """(names, normalised names) of the alias group holding name; just name itself when it is in none."""
+    n = _norm(name)
+    for g, norms in _GROUPS_NORM:
+        if n in norms:
+            return g, norms
+    return (name,), {n}
+
+
+def equivalents(name):
+    """name first, then its other names in other configs - to try one by one on a Nuke Read / Write."""
+    name = unwrap_default(name)
+    return [name] + [x for x in _group(name)[0] if x != name]
 
 
 def unwrap_default(value):
@@ -61,10 +134,13 @@ def to_comfy(nuke_name, available):
     name = unwrap_default(nuke_name)
     if name in available and not _is_role(name):
         return name
-    n = _norm(name)
-    hits = [a for a in available if _norm(a) == n]
-    for needle, target in _ALIASES:
-        if needle in n:
-            hits += [a for a in available if target in _norm(a)]
-            break
+    norms = _group(name)[1]
+    hits = [a for a in available if _norm(a) in norms]
+    if not [a for a in hits if not _is_role(a)]:
+        n = _norm(name)
+        for needle, target in _ALIASES:
+            if needle in n:
+                target_norms = _group(target)[1]
+                hits += [a for a in available if _norm(a) in target_norms]
+                break
     return _best(hits)

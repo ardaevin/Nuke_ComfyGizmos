@@ -191,9 +191,21 @@ def create(wf_id):
     group = nuke.createNode("Group", inpanel=False)
     group.setName("Comfy_" + wf["suffix"])
     group["tile_color"].setValue(TILE_DEFAULT)
-    _build_internals(group, wf)
-    _add_knobs(group, wf)
-    _ensure_usage(group, wf)                         # last: its tab must only hold the notes
+    try:
+        _build_internals(group, wf)
+        _add_knobs(group, wf)
+        _ensure_usage(group, wf)                     # last: its tab must only hold the notes
+    except Exception:
+        if not _non_commercial():
+            raise
+        # Nuke NC gives Python at most 10 nodes, then None: a half-built, empty group and a 'NoneType' error
+        try:
+            nuke.delete(group)
+        except Exception:
+            pass
+        raise RuntimeError("{} needs more nodes than Nuke Non-commercial lets Python create (10), so it needs a "
+                           "commercial Nuke licence. Smaller gizmos such as DSINE Normals work in "
+                           "Non-commercial.".format(wf["label"]))
     if upstream is not None:
         group.setInput(0, upstream)
         _place_below(group, upstream)
@@ -214,6 +226,13 @@ def create(wf_id):
     _update_label(group)
     group.showControlPanel()
     return group
+
+
+def _non_commercial():
+    try:
+        return bool(nuke.env["nc"])
+    except Exception:
+        return False
 
 
 def _place_below(node, upstream):
@@ -1297,6 +1316,7 @@ def _prepare(group, mode="render"):
     prompt = _fill_graph(wf, group, src_path, raw, comfy_cs, first, last, out_dir, out_name, out_cs, out_raw,
                          single)
     notes += _add_refs(prompt, wf, refs)
+    _ocio_inputs(prompt, available)
     extend_note, extend_offset = _apply_extend(prompt, wf, group)
     if extend_note:
         notes.append(extend_note)
@@ -1762,10 +1782,7 @@ def _ensure_source(group, write_name, path, first, last):
     """Use the source if its frames are on disk; render only the frames that are missing.
     Returns (colorspace, '' if nothing was rendered else what was)."""
     write = group.node(write_name)
-    try:
-        write["colorspace"].setValue(DEFAULT_COLORSPACE)
-    except Exception:
-        pass                                         # not in this config - keep the Write's default
+    _set_colorspace(write["colorspace"], colorspace.equivalents(DEFAULT_COLORSPACE))   # else keep the default
     cs = colorspace.unwrap_default(write["colorspace"].value())
     missing = [f for f in range(first, last + 1) if not os.path.isfile(path % f)]
     if not missing:
@@ -1800,6 +1817,23 @@ def _render_source(group, path, frames, write_name="SourceWrite"):
             start = prev = f
     finally:
         write["disable"].setValue(True)
+
+
+def _ocio_inputs(prompt, available):
+    """Fit every OCIO node's colorspace inputs to ComfyUI's active config and to old and new ComfyUI-OCIO.
+
+    The workflows were saved with ACES 1.2 names ('Utility - sRGB - Texture' for the working space); under an
+    ACES 1.3 / 2.0 config the same space is 'sRGB Encoded Rec.709 (sRGB)'. OCIO Write's 'from_colorspace' was
+    renamed 'input_colorspace' (ComfyUI-OCIO, 2026-08-16): both are sent, ComfyUI drops the one a node lacks."""
+    for node in prompt.values():
+        if not str(node.get("class_type", "")).startswith("OCIO"):
+            continue
+        ins = node.get("inputs", {})
+        if node["class_type"] == "OCIOWrite" and isinstance(ins.get("from_colorspace"), str):
+            ins["input_colorspace"] = ins["from_colorspace"]
+        for key, val in list(ins.items()):
+            if available and key.endswith("_colorspace") and isinstance(val, str) and val not in available:
+                ins[key] = colorspace.to_comfy(val, available) or val   # no match: ComfyUI names it in its error
 
 
 def _fill_graph(wf, group, src_path, raw, comfy_cs, first, last, out_dir, stem, out_cs, out_raw, single):
@@ -2154,14 +2188,27 @@ def _set_read_colorspace(read, cs):
         read["raw"].setValue(True)
         return
     read["raw"].setValue(False)
-    for name in (cs, cs.split(" - ")[-1]):          # 'ACES - ACEScg' -> 'ACEScg'
+    if not _set_colorspace(read["colorspace"], colorspace.equivalents(cs) + [cs.split(" - ")[-1]]):
+        nuke.tprint("[ComfyGizmos] {}: colorspace '{}' not in this config - set it by hand".format(read.name(), cs))
+
+
+def _set_colorspace(knob, names):
+    """Set the first of names this OCIO config has ('ACES - ACEScg' in ACES 1.2, 'ACEScg' in 1.3 / 2.0).
+    Names are checked against the knob's menu first: Nuke appends an unknown value instead of refusing it."""
+    try:
+        valid = {v.split("\t")[0].split("/")[-1].strip() for v in knob.values()}
+    except Exception:
+        valid = set()
+    for name in names:
+        if valid and name not in valid:
+            continue
         try:
-            read["colorspace"].setValue(name)
+            knob.setValue(name)
         except Exception:
             continue
-        if colorspace.unwrap_default(read["colorspace"].value()) == name:
-            return
-    nuke.tprint("[ComfyGizmos] {}: colorspace '{}' not in this config - set it by hand".format(read.name(), cs))
+        if colorspace.unwrap_default(knob.value()) == name:
+            return True
+    return False
 
 
 def _refresh_localization(read):
