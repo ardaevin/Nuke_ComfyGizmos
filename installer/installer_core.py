@@ -239,12 +239,16 @@ def install_pack(name, root, python, log):
                 z.extractall(os.path.join(root, "custom_nodes"))
             os.rename(os.path.join(root, "custom_nodes", top), dst)
     req = os.path.join(dst, "requirements.txt")
-    if os.path.isfile(req):
-        if not python:
-            log("{}: pip-install {} with ComfyUI's Python yourself (its Python wasn't found)".format(name, req))
-            return
-        log("{}: installing its Python requirements".format(name))
-        r = subprocess.run([python, "-s", "-m", "pip", "install", "-r", req], capture_output=True, text=True,
+    extra = models.catalog()["packs"][name].get("pip", [])      # needed, but missing from requirements.txt
+    if not os.path.isfile(req) and not extra:
+        return
+    if not python:
+        log("{}: pip-install {} with ComfyUI's Python yourself (its Python wasn't found)".format(
+            name, " ".join(([("-r " + req)] if os.path.isfile(req) else []) + extra)))
+        return
+    for args in ([["-r", req]] if os.path.isfile(req) else []) + ([extra] if extra else []):
+        log("{}: installing its Python requirements{}".format(name, "" if args[0] == "-r" else ": " + " ".join(args)))
+        r = subprocess.run([python, "-s", "-m", "pip", "install"] + args, capture_output=True, text=True,
                            **_no_window())
         if r.returncode:
             raise RuntimeError("pip install failed: " + (r.stderr or r.stdout).strip()[-600:])
@@ -307,6 +311,7 @@ def install_nuke(target, log):
         return
     block = "\n".join([
         MENU_START,
+        "import nuke",
         "try:",
         "    import sys as _sys",
         "    if {!r} not in _sys.path:".format(os.path.normpath(target)),
@@ -317,15 +322,13 @@ def install_nuke(target, log):
         "    nuke.tprint('comfygizmos failed to load: %s' % _err)",
         MENU_END])
     if MENU_START in text:
-        text = re.sub(re.escape(MENU_START) + r".*?" + re.escape(MENU_END), lambda m: block, text, flags=re.S)
-    else:
-        if os.path.isfile(menu):
-            backup = menu + ".bak-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            shutil.copy2(menu, backup)
-            log("Nuke: menu.py backed up to " + backup)
-        if "import nuke" not in text:
-            text = "import nuke\n" + text
-        text = text.rstrip("\n") + "\n\n" + block + "\n"
+        text = re.sub(r"\n*" + re.escape(MENU_START) + r".*?" + re.escape(MENU_END) + r"\n*", "\n\n", text, flags=re.S)
+    elif os.path.isfile(menu):
+        backup = menu + ".bak-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        shutil.copy2(menu, backup)
+        log("Nuke: menu.py backed up to " + backup)
+    # at the top: an error further down the user's own menu.py (e.g. a PySide2-only tool on Nuke 16+) stops the file
+    text = block + "\n\n" + text.strip("\n") + "\n"
     os.makedirs(NUKE_DIR, exist_ok=True)
     with open(menu, "w", encoding="utf-8") as f:
         f.write(text)

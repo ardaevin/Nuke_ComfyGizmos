@@ -379,6 +379,9 @@
    "url": "https://github.com/Fannovel16/comfyui_controlnet_aux",
    "nodes": [
     "DSINE-NormalMapPreprocessor"
+   ],
+   "pip": [
+    "timm"
    ]
   },
   "ltx_plate_tools": {

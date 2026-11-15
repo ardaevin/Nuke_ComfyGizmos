@@ -122,7 +122,8 @@ NO_FP4 = {
     "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
 }
 
-# Custom node packs. "bundled" = shipped in this repo's comfyui_nodes folder.
+# Custom node packs. "bundled" = shipped in this repo's comfyui_nodes folder. "pip" = packages the pack needs
+# but its requirements.txt leaves out; the installer pip-installs them after it.
 PACKS = {
     "ComfyUI-OCIO": {"url": "https://github.com/SlavaSexton/ComfyUI-OCIO", "nodes": ["OCIORead", "OCIOWrite"]},
     "ComfyUI-LTXVideo": {"url": "https://github.com/Lightricks/ComfyUI-LTXVideo", "nodes": [
@@ -137,7 +138,8 @@ PACKS = {
         "url": "https://github.com/GoogleCloudPlatform/comfyui-google-genmedia-custom-nodes",
         "nodes": ["Gemini31FlashImage", "Gemini3ProImage", "GeminiNode31", "Veo3ImageToVideoNode", "Veo3ReferenceToVideo"]},
     "comfyui_controlnet_aux": {"url": "https://github.com/Fannovel16/comfyui_controlnet_aux",
-                               "nodes": ["DSINE-NormalMapPreprocessor"]},
+                               "nodes": ["DSINE-NormalMapPreprocessor"],
+                               "pip": ["timm"]},                  # DSINE imports timm; not in requirements.txt
     "ltx_plate_tools": {"bundled": True, "nodes": ["LTXPlatePrep", "LTXPlateRestore", "PlateAspectPad",
                                                      "PlateAspectPadGeminiPro", "VeoVideoFrames"]},
     "audio_fallback": {"bundled": True, "nodes": ["AudioOrSilence"]},
