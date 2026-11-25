@@ -123,6 +123,11 @@ def version_ok(version):
     return version_tuple(version) >= version_tuple(catalog()["min_comfyui"])
 
 
+def node_version(node_class):
+    """The ComfyUI version that has one of ComfyUI's own nodes: some came later than min_comfyui."""
+    return catalog()["node_versions"].get(node_class, catalog()["min_comfyui"])
+
+
 def gpu_advice(name, vram_bytes):
     """(suggested tier, fp4 ok) for a GPU name and its memory in bytes."""
     fp4 = bool(BLACKWELL.search(name or ""))
@@ -168,7 +173,7 @@ def check(object_info, stats, graphs, tier="full", fp4=True, aces_ok=None):
         for node in graph.values():
             cls = node["class_type"]
             if cls not in object_info:
-                packs.add(pack_of(cls) or "ComfyUI {} or newer ({})".format(catalog()["min_comfyui"], cls))
+                packs.add(pack_of(cls) or "ComfyUI {} or newer ({})".format(node_version(cls), cls))
         for cls, key, name in model_files(graph):
             info = object_info.get(cls)
             if not info:

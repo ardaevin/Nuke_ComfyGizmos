@@ -170,6 +170,8 @@ FAMILIES = [
 ]
 
 MIN_COMFYUI = "0.41.0"
+# ComfyUI's own nodes that came later than MIN_COMFYUI: only the gizmos that use them need the newer version.
+NODE_VERSIONS = {"TextGenerateV2": "0.44.0", "MiniMaxH3ImageConditioning": "0.45.0"}
 
 
 def _repo_files(repo, cache={}):
@@ -210,7 +212,7 @@ def main():
             for val in node["inputs"].values():
                 if isinstance(val, str) and val.endswith(ext) and val not in models:
                     sys.exit("{}: model {} has no entry in SOURCES".format(fn, val))
-    catalog = {"min_comfyui": MIN_COMFYUI, "models": models, "medium": MEDIUM, "no_fp4": NO_FP4,
+    catalog = {"min_comfyui": MIN_COMFYUI, "node_versions": NODE_VERSIONS, "models": models, "medium": MEDIUM, "no_fp4": NO_FP4,
                "packs": PACKS, "families": [{"name": n, "workflows": ids} for n, ids in FAMILIES]}
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         json.dump(catalog, f, indent=1, ensure_ascii=False)

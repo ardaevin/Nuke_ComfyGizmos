@@ -27,6 +27,7 @@ All of them are under **Nodes > ComfyUI**.
 | **Flux 3 Klein Edit (Distilled)** | Same, with the faster step-distilled model | single | ACES2065-1 |
 | **Nano Banana 2** | Edits one frame from a text prompt, with up to 5 reference images, or makes a new image when no plate is connected (Gemini 3.1 Flash Image on Google Vertex AI; paid per render) | single | ACES2065-1 |
 | **Nano Banana Pro** | Same, with Gemini 3 Pro Image (costs more per render) | single | ACES2065-1 |
+| **MiniMax H3 Image** | Edits one frame from a text prompt, with up to 3 reference images, or makes a new image when no plate is connected | single | ACES2065-1 |
 
 **New images**
 
@@ -35,7 +36,7 @@ All of them are under **Nodes > ComfyUI**.
 | **Qwen Text to Image** | A new image from a text prompt; no inputs (Qwen-Image 2.1) | one image | ACES2065-1 |
 | **Qwen Text to Image (Turbo)** | Same, with the fixed 8-step Turbo model | one image | ACES2065-1 |
 
-Nano Banana 2 and Pro also do text to image: see above.
+Nano Banana 2 and Pro and MiniMax H3 Image also do text to image: see above.
 
 **Video**
 
@@ -59,6 +60,7 @@ Nano Banana 2 and Pro also do text to image: see above.
 | **LTX SDR to HDR** | SDR plate to scene-linear HDR (LTX-2.5 IC-LoRA) | range, up to 241 | ACES2065-1 |
 | **LTX SDR to HDR (Tiled)** | Same, two stages with a latent x2 upscale | range, up to 241 | ACES2065-1, upscaled |
 | **DSINE Normals** | Camera-space surface normals | single | raw EXR, decoded to -1..1 in the node |
+| **NormalCrafter** | Camera-space surface normals for a frame range, softer than DSINE but with less flicker | range, up to 300 | raw EXR, decoded to -1..1 in the node |
 | **VDA Depth** | Temporally consistent relative depth (Video Depth Anything Large) | range, up to 300 | raw 32-bit EXR |
 
 **Text**
@@ -71,8 +73,11 @@ Nano Banana 2 and Pro also do text to image: see above.
 
 Each gizmo's **How to use** tab ends with the licence of its model as it
 stood when checked (2026-11). In short: Qwen-Image 2.1 is research or
-evaluation only; MiniMax H3 isn't authorised in the US, EU, UK or South
-Korea; VDA Large is non-commercial; LTX-2.x is free under $10M annual
+evaluation only; MiniMax H3 (the video gizmos) isn't authorised in the US, EU,
+UK or South Korea; MiniMax H3 Image has its own licence and needs MiniMax's
+written permission above $1M annual revenue or for hosted services;
+NormalCrafter is Apache-2.0 but runs on Stable Video Diffusion XT (Stability
+AI Community License, free under $1M); VDA Large is non-commercial; LTX-2.x is free under $10M annual
 revenue; the Google nodes follow Google's API terms. Check the current terms
 before paid work.
 
@@ -87,8 +92,9 @@ config by default.
 
 **ComfyUI v0.41.0 or newer.** Several models' nodes are part of ComfyUI
 itself, so an older ComfyUI reports them as missing custom nodes, for example
-`Node 'Qwen Image 2.1 Cache' not found`. The Flux 3 Klein gizmos need v0.41.0,
-the Qwen gizmos v0.37.0 and the MiniMax H3 gizmos v0.34.0. To fix the error,
+`Node 'Qwen Image 2.1 Cache' not found`. MiniMax H3 Image needs v0.45.0 (built
+and used on v0.46.1), the Flux 3 Klein gizmos v0.41.0,
+the Qwen gizmos v0.37.0 and the other MiniMax H3 gizmos v0.34.0. To fix the error,
 update ComfyUI and restart it; installing a custom node won't help.
 
 **Graphics card.** The installer offers two model sizes:
@@ -97,8 +103,9 @@ update ComfyUI and restart it; installing a custom node won't help.
   (RTX 5090).
 - **Medium**: smaller official quantisations of the big models from the same
   Hugging Face repos, for about 24 GB cards (RTX 4090, 3090): int8 instead of
-  bf16 for LTX-2.5 and its Gemma encoders, w4a8 Qwen encoders and w6a8
-  MiniMax H3 models. Expect a little less detail than Full.
+  bf16 for LTX-2.5 and its Gemma encoders, w4a8 Qwen encoders, w6a8
+  MiniMax H3 models, and a w4a8 MiniMax H3 Image model with a 9B prompt
+  enhancer instead of 27B (neither tried yet). Expect a little less detail than Full.
 
 The MiniMax H3 text encoder is NVFP4, which runs fast only on RTX 50 series
 cards; on older cards the installer uses its int8 version instead (bigger, so
@@ -111,6 +118,7 @@ Download size per family, everything ticked:
 | LTX-2.5 | 87 GB | 50 GB |
 | Qwen-Image 2.1 | 44 GB | 36 GB |
 | MiniMax H3 | 88 GB | 78 GB (90 GB on cards older than RTX 50) |
+| MiniMax H3 Image | 55 GB (16 GB of it shared with MiniMax H3) | 37 GB (48 GB on cards older than RTX 50) |
 | Flux 3 Klein | 24 GB | 24 GB |
 | Google (Vertex AI) | none | none |
 | Depth and normals | downloaded by their packs | downloaded by their packs |
@@ -136,7 +144,9 @@ Per gizmo (the installer works this out for you; the files are the Full ones):
 | MiniMax FastH3 Image to Video | MiniMax-H3-Prompt-Rewriter-ComfyUI | `diffusion_models/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors`, plus the H3 VAE and encoder above |
 | MiniMax H3 Reference to Video | MiniMax-H3-Prompt-Rewriter-ComfyUI | `unet/minimax_h3_ref2va_pruned_int8_convrot.safetensors`, `loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors`, plus the H3 VAE and encoder above |
 | MiniMax H3 VFX Edit | none beyond ComfyUI-OCIO | the Reference to Video model and turbo LoRA above, `vae/minimax_h3_audio_vae_fp32.safetensors`, and `loras/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors` from [Alissonerdx/Minimax-H3-ComfyUI](https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI) |
+| MiniMax H3 Image | none beyond ComfyUI-OCIO (the H3 nodes are part of ComfyUI) | `diffusion_models/minimax_h3_image_pruned_int8_convrot.safetensors`, `vae/minimax_h3_image_vae_fp16.safetensors`, `text_encoders/qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors` (prompt enhancer) from [Comfy-Org/MiniMax-H3-Image](https://huggingface.co/Comfy-Org/MiniMax-H3-Image), plus the H3 encoder above |
 | DSINE Normals | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) | DSINE (downloaded by the pack on first use) |
+| NormalCrafter | [ComfyUI-NormalCrafterWrapper](https://github.com/AIWarper/ComfyUI-NormalCrafterWrapper) | NormalCrafter (4.2 GB) and parts of Stable Video Diffusion XT (1.2 GB), downloaded by the pack on first use. SVD-XT is gated: accept its licence on Hugging Face and log in on that machine first |
 | VDA Depth | [ComfyUI-Video-Depth-Anything](https://github.com/yuvraj108c/ComfyUI-Video-Depth-Anything) | `videodepthanything/video_depth_anything_vitl.pth` (downloaded by the pack on first use) |
 | Flux 3 Klein Edit | `ltx_plate_tools` (the Flux nodes are part of ComfyUI) | `diffusion_models/flux3_image_klein_base_int8_convrot.safetensors`, `vae/flux2-vae.safetensors`, `text_encoders/qwen3vl_4b_int8_convrot.safetensors`, `text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors` (prompt upsampler), from [black-forest-labs/flux-3-image-klein-comfy](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy) |
 | Flux 3 Klein Edit (Distilled) | `ltx_plate_tools` | as above, with `diffusion_models/flux3_image_klein_sd_int8_convrot.safetensors` |
@@ -238,7 +248,8 @@ inputs (`ref`, `last`, `outfit`, `picture`, ...) count as inputs too.
 - **Anything else** (a Grade, Merge, Crop, ...) is rendered to EXR first,
   into the `sources` folder, and that render is sent.
 - **Nothing**: the Qwen Text to Image gizmos have no input, and Nano Banana 2
-  and Pro make a new image when their plate is left unconnected.
+  and Pro and MiniMax H3 Image make a new image when their plate is left
+  unconnected.
 
 ### Name
 
@@ -251,8 +262,9 @@ The gizmo part of the name is fixed per gizmo: `LTXAlpha`, `LTXHDR`,
 `LTXHDRTiled`, `LTXI2VHDR`, `LTXRefine`, `QwenEdit`, `QwenEditTurbo`,
 `QwenT2I`, `QwenT2ITurbo`, `QwenOutpaint`, `QwenBGRemove`, `QwenLightBlend`,
 `QwenOutfit`, `Flux3Klein`, `Flux3KleinDistilled`, `NanoBanana2`,
-`NanoBananaPro`, `MiniMaxH3`, `FastH3`, `H3Ref`, `H3VFXEdit`, `Veo31`,
-`Veo31Ref`, `DSINENormal`, `VDADepth` or `Gemini31Pro`.
+`NanoBananaPro`, `MiniMaxH3`, `FastH3`, `H3Ref`, `H3VFXEdit`, `H3Image`,
+`Veo31`, `Veo31Ref`, `DSINENormal`, `NormalCrafter`, `VDADepth` or
+`Gemini31Pro`.
 
 ### Folders and versions
 
@@ -314,8 +326,8 @@ image to such a model has a **highlights** menu:
   and whites stay at 1.
 
 It defaults to **roll off** on the image and video gizmos, and to **clip** on
-DSINE Normals, VDA Depth and LTX Alpha Gen, where it only sets what the
-model sees. The LTX HDR gizmos have no menu, since they work in scene-linear.
+DSINE Normals, NormalCrafter, VDA Depth and LTX Alpha Gen, where it only sets
+what the model sees. The LTX HDR gizmos have no menu, since they work in scene-linear.
 On Gemini 3.1 Pro it only applies to what is sent.
 
 How **roll off** is done depends on ComfyUI's OCIO config:
@@ -342,7 +354,7 @@ Either way, comp the result back over the plate only where it changed.
   process. It doesn't follow the playhead. **hold on all frames** shows the
   result on every frame. The text to image gizmos have no frame.
 - **crop** + **crop area** (LTX Alpha Gen, Qwen Image Edit, Remove
-  Background, Light Blend, Outfit Swap, Nano Banana): send only an area of the plate, for more detail on a small fix.
+  Background, Light Blend, Outfit Swap, Nano Banana, MiniMax H3 Image): send only an area of the plate, for more detail on a small fix.
   The area starts as the whole plate and follows the plate's resolution until
   you move it in the viewer. The result is put back in the full plate frame.
 - **seed** + **increment** (gizmos with a seed): with increment on (the
@@ -366,7 +378,7 @@ Either way, comp the result back over the plate only where it changed.
   - Single-frame results come in as a still of the actual file, so they show
     on every frame.
   - LTX Alpha Gen adds a Crop and a red-to-alpha Shuffle (see below), DSINE
-    Normals adds its -1..1 decode, and Qwen Outpaint adds a Transform that
+    Normals and NormalCrafter add their -1..1 decode, and Qwen Outpaint adds a Transform that
     lines the bigger canvas up with the plate.
   - The node's own Read skips Nuke's file localization, so re-rendering a
     version always shows the new files.
@@ -490,6 +502,21 @@ Either way, comp the result back over the plate only where it changed.
   sentence: the edit, then what must stay the same. An optional
   `first_frame` (a frame you already fixed, named `<Picture 1>` in the
   prompt) carries that edit through the shot; use an FFP LoRA with it.
+- **MiniMax H3 Image**:
+  - With a plate connected it edits that frame; with none it is text to image
+    at the project format's size. The plate is `<Picture 1>` and `ref2`-`ref4`
+    are `<Picture 2>`-`<Picture 4>`.
+  - **refine prompt** (on by default) has the official enhancer write the long
+    description H3 wants from your short instruction, with the same enhancer
+    buttons as Qwen. **enhancer megapixels** (advanced) is the size of the
+    plate and refs it looks at.
+  - **megapixels** (4-16, default 8) is the size H3 works at; the result is
+    scaled back to plate size. It redraws the whole frame, so comp it back
+    only where it changed.
+  - If the enhancer is very slow, look for `You need pytorch with cu130 or
+    higher` in ComfyUI's startup log: without it ComfyUI runs these compressed
+    models on slow generic code. On an RTX 5090 the enhancer wrote about 1.4
+    tokens/s on cu128 and 126 on cu130 (different image and prompt).
 - **Veo 3.1 Image to Video / Reference to Video**: **model**, **duration**,
   **resolution** and **seed**; person generation and the GCP project and
   region are in advanced. Output is at Veo's own size (16:9 or 9:16), no
@@ -498,6 +525,13 @@ Either way, comp the result back over the plate only where it changed.
   gets blocked by Google's filter.
 - **DSINE Normals**: fov, iterations and resolution. **output** is
   `normals -1..1` or `encoded 0..1`.
+- **NormalCrafter**: **resolution** is the longest side the model sees (1024;
+  the result is scaled back to plate size), **window** how many frames it
+  processes together and **step** how far that window moves. For flicker,
+  raise **window** or keep **step** below it. Out of memory: lower
+  **resolution**, then **window**, then **decode chunk** (advanced). Same
+  **output** menu as DSINE; its axis directions haven't been compared with
+  DSINE's, so check before mixing them. Desqueeze anamorphic plates first.
 - **VDA Depth**: relative inverse depth (white = near, black = far), not
   metric. 0-1 is normalised over the frames sent, so render the whole shot in
   one go. **input size** is the short side the model sees: higher means more
@@ -593,7 +627,8 @@ Full models are used:
    `SOURCES` in `tools/make_catalog.py` (and its smaller version to `MEDIUM`,
    if there is one), then run `python tools/make_catalog.py`. It reads sizes
    from Hugging Face and stops if any workflow loads a file it doesn't know.
-   A new custom node goes in `PACKS`, and the gizmo in a `FAMILIES` group.
+   A new custom node goes in `PACKS`, a ComfyUI node newer than `MIN_COMFYUI`
+   in `NODE_VERSIONS`, and the gizmo in a `FAMILIES` group.
 6. Run `python install.py` (or the installer) and restart Nuke.
 
 ## Tests
@@ -607,7 +642,7 @@ because Nuke reads bare numbers as a frame range.
   versions.
 - `nuke_test.py`, `nuke_test_workflow.py`, `nuke_test_qwen.py`,
   `nuke_test_normals.py`: end-to-end per gizmo. The gizmos added since
-  (text to image, Outpaint, the video gizmos, VDA Depth, LTX Refine, LTX
-  Layout to Render and I2V HDR) have no tests yet, and the Google gizmos have none because every run
+  (text to image, Outpaint, the video gizmos, MiniMax H3 Image, NormalCrafter,
+  VDA Depth, LTX Refine, LTX Layout to Render and I2V HDR) have no tests yet, and the Google gizmos have none because every run
   is a paid API call.
 - `test_colorspace.py`: colorspace name matching against the live ComfyUI.

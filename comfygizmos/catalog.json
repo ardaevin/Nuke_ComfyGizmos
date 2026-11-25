@@ -1,5 +1,9 @@
 {
  "min_comfyui": "0.41.0",
+ "node_versions": {
+  "TextGenerateV2": "0.44.0",
+  "MiniMaxH3ImageConditioning": "0.45.0"
+ },
  "models": {
   "ltx-2.5-22b-distilled-transformer-bf16.safetensors": {
    "folder": "diffusion_models",
