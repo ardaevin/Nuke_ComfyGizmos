@@ -1,0 +1,83 @@
+{
+  "id": "normalcrafter",
+  "label": "NormalCrafter",
+  "description": "NormalCrafter: temporally consistent surface normals (camera space) for a frame range. Output: raw EXR at plate size and plate frame numbers, 0-1 encoded; the node shows them decoded to -1..1.",
+  "usage": [
+    "Camera-space normals for a frame range, steady from frame to frame (NormalCrafter, built on Stable Video Diffusion).",
+    "Whole input range is sent; tick 'input range' to send only first-last. Desqueeze anamorphic plates first.",
+    "Softer than DSINE (the model works at 'resolution', 1024 by default, and is scaled back to plate size), but far less flicker. Use DSINE for stills.",
+    "Flicker: raise 'window', or set 'step' below 'window' so the windows overlap. Out of memory: lower 'resolution' first, then 'window', then 'decode chunk'.",
+    "Output: 0-1 encoded normals; the node shows them decoded to -1..1.",
+    "highlights: what the model sees. 'clip' (default) cuts at 1 and keeps shadows open. 'roll off' compresses highlights but crushes deep shadows.",
+    "First run downloads NormalCrafter (4.2 GB) and parts of Stable Video Diffusion XT (1.2 GB, gated: accept it on Hugging Face and log in first).",
+    "License (checked 2026-11): NormalCrafter weights Apache-2.0; they run on Stable Video Diffusion XT, which is under the Stability AI Community License (commercial use free under USD 1M annual revenue)."
+  ],
+  "api": "normalcrafter.api.json",
+  "suffix": "NormalCrafter",
+  "input_name": "plate",
+  "max_frames": 300,
+  "read": {
+    "node": "1"
+  },
+  "write": {
+    "node": "4"
+  },
+  "output": {
+    "kind": "normals",
+    "raw": true,
+    "tooltip": "Normals are vectors, not colour: written and read as raw."
+  },
+  "knobs": [
+    {
+      "name": "resolution",
+      "label": "resolution",
+      "type": "int",
+      "node": "3",
+      "input": "max_res_dimension",
+      "default": 1024,
+      "tooltip": "Longest side the model sees, 256-2048 in steps of 64. Higher = more detail, much more VRAM. The result is scaled back to plate size."
+    },
+    {
+      "name": "window",
+      "label": "window",
+      "type": "int",
+      "node": "3",
+      "input": "window_size",
+      "default": 14,
+      "tooltip": "Frames processed together (2-64). Bigger = steadier, more VRAM."
+    },
+    {
+      "name": "step",
+      "label": "step",
+      "type": "int",
+      "node": "3",
+      "input": "time_step_size",
+      "default": 10,
+      "tooltip": "How far the window moves each time (1-64). Below 'window' the windows overlap and are blended, which smooths the joins."
+    },
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Utility - sRGB - Texture", "targets": [{"node": "1", "input": "output_colorspace"}], "tooltip": "What the model sees; only the input changes, as normals are data and aren't converted back. clip (default): values above 1 become 1 (colorimetric), shadows stay open. roll off: the plate goes in through ACES Output - sRGB, so highlights are compressed instead of cut, but deep shadows are crushed. Try roll off on shots with large blown-out areas."},
+    {
+      "name": "advanced",
+      "label": "advanced",
+      "type": "group"
+    },
+    {
+      "name": "decode_chunk",
+      "label": "decode chunk",
+      "type": "int",
+      "node": "3",
+      "input": "decode_chunk_size",
+      "default": 4,
+      "tooltip": "Frames the VAE decodes at once (1-64). Lower it if decoding runs out of memory."
+    },
+    {
+      "name": "seed",
+      "label": "seed",
+      "type": "int",
+      "node": "3",
+      "input": "seed",
+      "default": 42,
+      "tooltip": "Noise seed."
+    }
+  ]
+}

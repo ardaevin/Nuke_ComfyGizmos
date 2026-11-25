@@ -1,0 +1,65 @@
+{
+  "1": {
+    "inputs": {
+      "source": "",
+      "frame_mode": "auto",
+      "input_colorspace": "ACES - ACES2065-1",
+      "output_colorspace": "Utility - sRGB - Texture",
+      "raw_data": false,
+      "start_frame": 0,
+      "end_frame": 0,
+      "frame_shift": 0,
+      "missing_frames": "black",
+      "edge_mode": "hold",
+      "fps": 0
+    },
+    "class_type": "OCIORead",
+    "_meta": {"title": "Source Plate - OCIO Read"}
+  },
+  "2": {
+    "inputs": {"blend_factor": 0, "blend_mode": "normal", "image1": ["1", 0], "image2": ["1", 0]},
+    "class_type": "ImageBlend",
+    "_meta": {"title": "Clamp 0-1"}
+  },
+  "3": {
+    "inputs": {
+      "seed": 42,
+      "max_res_dimension": 1024,
+      "window_size": 14,
+      "time_step_size": 10,
+      "decode_chunk_size": 4,
+      "offload_pipe_to_cpu_on_finish": true,
+      "use_xformers": "auto",
+      "images": ["2", 0]
+    },
+    "class_type": "NormalCrafterNode",
+    "_meta": {"title": "NormalCrafter (output 0-1, at plate size)"}
+  },
+  "4": {
+    "inputs": {
+      "profile": "none",
+      "from_colorspace": "Utility - sRGB - Texture",
+      "output_colorspace": "ACES - ACES2065-1",
+      "container": "sequence",
+      "still_format": "exr",
+      "video_codec": "prores_4444",
+      "bit_depth": "16f",
+      "compression": "zip",
+      "auto_range": true,
+      "first_frame": 1,
+      "last_frame": 0,
+      "start_number": 1,
+      "source_start": 1,
+      "raw_data": true,
+      "colorspace_in_name": false,
+      "output_folder": "",
+      "filename": "",
+      "auto_colorspace": false,
+      "fps": 25,
+      "render_nonce": "",
+      "images": ["3", 0]
+    },
+    "class_type": "OCIOWrite",
+    "_meta": {"title": "Normals Write - raw EXR sequence"}
+  }
+}

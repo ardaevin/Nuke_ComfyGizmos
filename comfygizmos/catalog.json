@@ -239,6 +239,41 @@
    "size": 27141342152,
    "gated": false
   },
+  "minimax_h3_image_pruned_int8_convrot.safetensors": {
+   "folder": "diffusion_models",
+   "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/main/diffusion_models/minimax_h3_image_pruned_int8_convrot.safetensors",
+   "page": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image",
+   "size": 20979314802,
+   "gated": false
+  },
+  "minimax_h3_image_pruned_w4a8.safetensors": {
+   "folder": "diffusion_models",
+   "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/main/diffusion_models/minimax_h3_image_pruned_w4a8.safetensors",
+   "page": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image",
+   "size": 12549794530,
+   "gated": false
+  },
+  "minimax_h3_image_vae_fp16.safetensors": {
+   "folder": "vae",
+   "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/main/vae/minimax_h3_image_vae_fp16.safetensors",
+   "page": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image",
+   "size": 1168505312,
+   "gated": false
+  },
+  "qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors": {
+   "folder": "text_encoders",
+   "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/main/text_encoders/qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors",
+   "page": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image",
+   "size": 17286101484,
+   "gated": false
+  },
+  "qwen3.5_9b_w4a8_gptq.safetensors": {
+   "folder": "text_encoders",
+   "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/main/text_encoders/qwen3.5_9b_w4a8_gptq.safetensors",
+   "page": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image",
+   "size": 7343591088,
+   "gated": false
+  },
   "minimax_h3_video_vae_int8_convrot.safetensors": {
    "folder": "vae",
    "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_video_vae_int8_convrot.safetensors",
@@ -322,7 +357,9 @@
   "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors": "qwen3.5_9b_qwen_image_2.1_pe_i2i_w4a8.safetensors",
   "qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors": "qwen3.5_9b_qwen_image_2.1_pe_t2i_w4a8.safetensors",
   "minimax_h3_fl2va_pruned_int8_convrot.safetensors": "minimax_h3_fl2va_pruned_w6a8.safetensors",
-  "minimax_h3_ref2va_pruned_int8_convrot.safetensors": "minimax_h3_ref2va_pruned_w6a8.safetensors"
+  "minimax_h3_ref2va_pruned_int8_convrot.safetensors": "minimax_h3_ref2va_pruned_w6a8.safetensors",
+  "minimax_h3_image_pruned_int8_convrot.safetensors": "minimax_h3_image_pruned_w4a8.safetensors",
+  "qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors": "qwen3.5_9b_w4a8_gptq.safetensors"
  },
  "no_fp4": {
   "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors"
@@ -356,6 +393,12 @@
     "LoadVideoDepthAnythingModel",
     "VideoDepthAnythingOutput",
     "VideoDepthAnythingProcess"
+   ]
+  },
+  "ComfyUI-NormalCrafterWrapper": {
+   "url": "https://github.com/AIWarper/ComfyUI-NormalCrafterWrapper",
+   "nodes": [
+    "NormalCrafterNode"
    ]
   },
   "MiniMax-H3-Prompt-Rewriter-ComfyUI": {
@@ -436,6 +479,12 @@
    ]
   },
   {
+   "name": "MiniMax H3 Image",
+   "workflows": [
+    "minimax_h3_image"
+   ]
+  },
+  {
    "name": "Flux 3 Klein",
    "workflows": [
     "flux3_klein",
@@ -456,7 +505,8 @@
    "name": "Depth and normals",
    "workflows": [
     "vda_depth",
-    "dsine_normals"
+    "dsine_normals",
+    "normalcrafter"
    ]
   }
  ]

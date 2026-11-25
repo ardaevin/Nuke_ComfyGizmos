@@ -18,6 +18,7 @@ WORKFLOWS = os.path.join(HERE, "..", "comfygizmos", "workflows")
 LTX = "Lightricks/LTX-2.5"
 QWEN = "Comfy-Org/Qwen-Image-2.1"
 H3 = "Comfy-Org/MiniMax-H3"
+H3I = "Comfy-Org/MiniMax-H3-Image"
 FLUX = "black-forest-labs/flux-3-image-klein-comfy"
 
 # file name the workflows use -> (models sub-folder, HF repo, path in the repo). repo None = no public source
@@ -84,6 +85,13 @@ SOURCES = {
         ("diffusion_models", "FastVideo/FastVideo-FastH3-Comfy", "diffusion_models/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors"),
     "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors": ("text_encoders", H3, "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"),
     "qwen3vl_32b_minimax_h3_int8_convrot.safetensors": ("text_encoders", H3, "text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors"),
+    "minimax_h3_image_pruned_int8_convrot.safetensors":
+        ("diffusion_models", H3I, "diffusion_models/minimax_h3_image_pruned_int8_convrot.safetensors"),
+    "minimax_h3_image_pruned_w4a8.safetensors": ("diffusion_models", H3I, "diffusion_models/minimax_h3_image_pruned_w4a8.safetensors"),
+    "minimax_h3_image_vae_fp16.safetensors": ("vae", H3I, "vae/minimax_h3_image_vae_fp16.safetensors"),
+    "qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors":
+        ("text_encoders", H3I, "text_encoders/qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors"),
+    "qwen3.5_9b_w4a8_gptq.safetensors": ("text_encoders", H3I, "text_encoders/qwen3.5_9b_w4a8_gptq.safetensors"),
     "minimax_h3_video_vae_int8_convrot.safetensors": ("vae", H3, "vae/minimax_h3_video_vae_int8_convrot.safetensors"),
     "minimax_h3_audio_vae_fp32.safetensors": ("vae", H3, "vae/minimax_h3_audio_vae_fp32.safetensors"),
     "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors":
@@ -115,6 +123,8 @@ MEDIUM = {
     "qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors": "qwen3.5_9b_qwen_image_2.1_pe_t2i_w4a8.safetensors",
     "minimax_h3_fl2va_pruned_int8_convrot.safetensors": "minimax_h3_fl2va_pruned_w6a8.safetensors",
     "minimax_h3_ref2va_pruned_int8_convrot.safetensors": "minimax_h3_ref2va_pruned_w6a8.safetensors",
+    "minimax_h3_image_pruned_int8_convrot.safetensors": "minimax_h3_image_pruned_w4a8.safetensors",
+    "qwen3.8_27b_minimax_h3_image_pe_w4a8_gptq.safetensors": "qwen3.5_9b_w4a8_gptq.safetensors",   # lighter enhancer
 }
 
 # NVFP4 files run fast only on RTX 50 (Blackwell) cards; other cards get this instead.
@@ -132,6 +142,8 @@ PACKS = {
         "LTXVTiledFusionSampler", "LTXVVAEForceFloat32"]},
     "ComfyUI-Video-Depth-Anything": {"url": "https://github.com/yuvraj108c/ComfyUI-Video-Depth-Anything", "nodes": [
         "LoadVideoDepthAnythingModel", "VideoDepthAnythingOutput", "VideoDepthAnythingProcess"]},
+    "ComfyUI-NormalCrafterWrapper": {"url": "https://github.com/AIWarper/ComfyUI-NormalCrafterWrapper",
+                                     "nodes": ["NormalCrafterNode"]},  # downloads its weights on first use
     "MiniMax-H3-Prompt-Rewriter-ComfyUI": {"url": "https://github.com/pytraveler/MiniMax-H3-Prompt-Rewriter-ComfyUI",
                                            "nodes": ["MiniMaxH3PromptWriter8B", "MiniMaxH3PromptWriterOmni"]},
     "comfyui-google-genmedia-custom-nodes": {
@@ -151,9 +163,10 @@ FAMILIES = [
     ("Qwen-Image 2.1", ["qwen_edit", "qwen_edit_turbo", "qwen_t2i", "qwen_t2i_turbo", "qwen_outpaint",
                         "qwen_bg_removal", "qwen_light_blend", "qwen_outfit_swap"]),
     ("MiniMax H3", ["minimax_h3_i2v", "fasth3_i2v", "minimax_h3_r2v", "minimax_h3_vfx_edit"]),
+    ("MiniMax H3 Image", ["minimax_h3_image"]),
     ("Flux 3 Klein", ["flux3_klein", "flux3_klein_distilled"]),
     ("Google (Vertex AI, no local models)", ["nano_banana2", "nano_banana_pro", "veo31_i2v", "veo31_r2v", "gemini31_pro"]),
-    ("Depth and normals", ["vda_depth", "dsine_normals"]),
+    ("Depth and normals", ["vda_depth", "dsine_normals", "normalcrafter"]),
 ]
 
 MIN_COMFYUI = "0.41.0"

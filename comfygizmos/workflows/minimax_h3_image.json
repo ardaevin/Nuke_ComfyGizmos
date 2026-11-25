@@ -1,0 +1,65 @@
+{
+  "id": "minimax_h3_image",
+  "label": "MiniMax H3 Image",
+  "description": "MiniMax H3 Image: edit one frame with a plate connected, or text to image with nothing connected. Up to 3 reference images. Output: ACES2065-1 EXR at plate size (or the project format).",
+  "usage": [
+    "One node, two modes: with a plate connected it edits that frame; with nothing in the plate input it is text to image at the project format's aspect and size.",
+    "Pick the frame with 'frame' (Set to current frame) - only that frame is sent.",
+    "The plate is <Picture 1>, ref2-ref4 are <Picture 2>-<Picture 4>. With no plate, the connected refs are numbered from <Picture 1>.",
+    "Keep 'refine prompt' on: H3 Image wants a long, complete English description, and the official enhancer writes it from your short instruction (it looks at the plate and refs). 'Run enhancer only' shows its rewrite first.",
+    "'megapixels' is the size H3 works at (4-16; best around 16, soft under 4). The result is scaled back to plate size. Lower it first if you run out of VRAM.",
+    "H3 redraws the whole frame - there is no mask and the original pixels aren't kept. Comp the edit back over the plate only where it changed.",
+    "Crop: tick 'crop' and move the box in the viewer to send only that area (more detail on small fixes).",
+    "Press Render in ComfyUI; Bring in output reads the result under the node.",
+    "highlights: 'roll off' (default) compresses values above 1 going in: highlights return approximate, saturated colours shift, deep shadows are crushed and new near-whites come back hot. 'clip' cuts at 1 and keeps shadows open.",
+    "License (checked 2026-11): MiniMax-H3-Image Community License. Above USD 1M annual revenue (you and affiliates), or for hosted services, you need written permission from MiniMax."
+  ],
+  "api": "minimax_h3_image.api.json",
+  "suffix": "H3Image",
+  "frames": "single",
+  "input_name": "plate",
+  "read": {"node": "100"},
+  "write": {"node": "101"},
+  "crop": {"default": false},
+  "no_plate": {
+    "remove": ["100", "8", "9"],
+    "unlink": [{"node": "20", "input": "images.image_1"}, {"node": "12", "input": "images.image1"}],
+    "values": [{"node": "10", "input": "switch", "value": false}],
+    "write_images": ["24", 0]
+  },
+  "refs": [
+    {"name": "ref2", "targets": [{"node": "20", "input": "images.image_2"}, {"node": "12", "input": "images.image2", "via": "9"}]},
+    {"name": "ref3", "targets": [{"node": "20", "input": "images.image_3"}, {"node": "12", "input": "images.image3", "via": "9"}]},
+    {"name": "ref4", "targets": [{"node": "20", "input": "images.image_4"}, {"node": "12", "input": "images.image4", "via": "9"}]}
+  ],
+  "size": {
+    "megapixels_knob": "megapixels",
+    "multiple": 32,
+    "width": [{"node": "8", "input": "width"}, {"node": "20", "input": "width"}],
+    "height": [{"node": "8", "input": "height"}, {"node": "20", "input": "height"}],
+    "plate_width": [{"node": "24", "input": "width"}],
+    "plate_height": [{"node": "24", "input": "height"}]
+  },
+  "output": {
+    "kind": "image",
+    "colorspace": "ACES - ACES2065-1",
+    "convert": true,
+    "tooltip": "H3 Image makes a display-referred image at its work size; it is scaled back to plate size and comes back to scene-linear through the 'highlights' choice. Comp an edit back only where it changed."
+  },
+  "enhancer": {
+    "after": "refine_prompt",
+    "output_node": "15",
+    "nodes": ["12"],
+    "force": [{"node": "14", "input": "switch", "value": true}, {"node": "12", "input": "thinking", "value": true}]
+  },
+  "knobs": [
+    {"name": "prompt", "label": "prompt", "type": "multiline", "default": "", "targets": [{"node": "11", "input": "replace"}, {"node": "14", "input": "on_false"}], "tooltip": "Edit: the instruction, e.g. 'Replace the car in <Picture 1> with ...'. Text to image (no plate): what to make. The plate is <Picture 1>; ref2-ref4 are <Picture 2>-<Picture 4>. With 'refine prompt' off, write the full long description yourself."},
+    {"name": "refine_prompt", "label": "refine prompt", "type": "bool", "default": true, "targets": [{"node": "14", "input": "switch"}, {"node": "12", "input": "thinking"}], "tooltip": "On (default): the official H3 Image prompt enhancer turns the prompt into the long description H3 needs (slower, much better on short prompts). Off: the prompt goes in as typed."},
+    {"name": "megapixels", "label": "megapixels", "type": "float", "default": 8.0, "min": 4.0, "max": 16.0, "tooltip": "Size H3 works at, with the plate's aspect (the project format's with no plate), a multiple of 32; scaled back to plate size after. 4-20 MP is its working range, best around 16; below 4 it gets soft. Higher = more detail, more VRAM and time."},
+    {"name": "seed", "label": "seed", "type": "int", "default": 42, "targets": [{"node": "22", "input": "seed"}, {"node": "12", "input": "sampling_mode.seed"}]},
+    {"name": "highlights", "label": "highlights", "type": "choice", "values": ["Utility - sRGB - Texture", "Output - sRGB"], "labels": ["clip", "roll off"], "default": "Output - sRGB", "targets": [{"node": "100", "input": "output_colorspace"}, {"node": "101", "input": "from_colorspace"}], "tooltip": "roll off (default): the plate and refs go in through ACES Output - sRGB and the result comes back through its inverse, so highlights are compressed instead of cut. Highlights come back approximate, saturated colours shift, deep shadows are crushed, and new near-white pixels come back hot. clip: values above 1 reach the model as 1 (colorimetric), shadows stay open. Comp only the changed area."},
+    {"name": "advanced", "label": "advanced", "type": "group"},
+    {"name": "steps", "label": "steps", "type": "int", "default": 6, "node": "22", "input": "steps", "tooltip": "6 is the official value (the model is distilled for it)."},
+    {"name": "enhancer_mp", "label": "enhancer megapixels", "type": "float", "default": 4.0, "min": 0.5, "max": 16.0, "node": "9", "input": "megapixels", "tooltip": "Size of the plate and refs the prompt enhancer looks at (H3 itself still gets them at 'megapixels'). Each is scaled to this size; every 32x32 pixels is one token for the enhancer to read."}
+  ]
+}

@@ -91,6 +91,11 @@ def register_menu():
         menu.addCommand(wf["label"], "comfygizmos.create({!r})".format(wf_id))
     menu.addSeparator()
     menu.addCommand("Check setup...", "comfygizmos.check_setup()")
+    try:
+        nuke.removeOnScriptLoad(resume_jobs)              # once, even if the menu is built again
+    except Exception:
+        pass
+    nuke.addOnScriptLoad(resume_jobs)
 
 
 def _enabled_workflows():
@@ -841,8 +846,9 @@ def _update_plate_knobs(group):
 
 
 def _apply_no_plate(prompt, wf, group):
-    """Manifest 'no_plate' {remove, unlink, set, write_images}: take the plate's nodes out of the graph, after the
-    knobs and refs are filled in (refs are copies of the plate's Read). Returns a status note."""
+    """Manifest 'no_plate' {remove, unlink, set, values, write_images}: take the plate's nodes out of the graph,
+    after the knobs and refs are filled in (refs are copies of the plate's Read). 'set' copies a knob into an
+    input; 'values' sets a fixed value (e.g. a switch to the text-to-image branch). Returns a status note."""
     spec = wf.get("no_plate")
     if not spec:
         return "text to image"
@@ -853,6 +859,8 @@ def _apply_no_plate(prompt, wf, group):
         value = _knob_value(group["wf_" + t["knob"]])
         prompt[t["node"]]["inputs"][t["input"]] = value
         values.append(str(value))
+    for t in spec.get("values", []):
+        prompt[t["node"]]["inputs"][t["input"]] = t["value"]
     for t in spec.get("unlink", []):
         prompt[t["node"]]["inputs"].pop(t["input"], None)
     for nid in spec.get("remove", []):
@@ -1358,6 +1366,7 @@ def _prepare(group, mode="render"):
                "text_node": wf["output"]["text_node"], "reply_path": "{}/{}.txt".format(out_dir, out_name),
                "started": time.time(), "notes": "; ".join(notes)}
         _jobs[group.fullName()] = job
+        _save_job(group, job)
         group["cg_prompt_id"].setValue(prompt_id)
         what = {"none": "text only", "frame": "frame {}".format(first),
                 "range": "frames {}-{} as video".format(first, last)}[send]
@@ -1374,6 +1383,7 @@ def _prepare(group, mode="render"):
         job = {"group": group.fullName(), "host": host, "prompt_id": prompt_id, "kind": "enhance",
                "enhancer_node": enh["output_node"], "started": time.time()}
         _jobs[group.fullName()] = job
+        _save_job(group, job)
         group["cg_prompt_id"].setValue(prompt_id)
         _set_status(group, "prompt enhancer queued")
         _set_state(group, "refining")
@@ -1381,8 +1391,7 @@ def _prepare(group, mode="render"):
 
     # output naming = whatever OCIO Write will produce (<stem>_<tag>.####.exr)
     first_file = client.write_first_path(host, prompt[wf["write"]["node"]]["inputs"])
-    result = re.sub(r"\.(\d+)(\.[^./]+)$", lambda m: ".%0{}d{}".format(len(m.group(1)), m.group(2)),
-                    first_file)
+    result = _seq_pattern(first_file)
     if os.name == "nt" and len(os.path.abspath(first_file)) > MAX_PATH:
         # ComfyUI writes it, but Nuke (and its Python) can't open a path this long: it would look missing
         raise _Abort("the output path is {} characters, over Windows' {} - use a shorter Name or a shorter "
@@ -1410,6 +1419,7 @@ def _prepare(group, mode="render"):
     if watcher:
         job["watcher"], job["refine_nodes"] = watcher, enh["nodes"]
     _jobs[group.fullName()] = job
+    _save_job(group, job)
     group["cg_prompt_id"].setValue(prompt_id)
     what = "frame {}".format(first) if single else "{} frames".format(count)
     if gen:
@@ -1507,16 +1517,12 @@ def _apply_size(prompt, wf, group):
         area = mp * 1000000.0
         w = max(m, int(round((area * pw / float(ph)) ** 0.5 / m)) * m)
         h = max(m, int(round((area * ph / float(pw)) ** 0.5 / m)) * m)
-    for t in spec.get("width", []):
-        prompt[t["node"]]["inputs"][t["input"]] = w
-    for t in spec.get("height", []):
-        prompt[t["node"]]["inputs"][t["input"]] = h
-    for t in spec.get("plate_width", []):            # back to plate size at the end
-        prompt[t["node"]]["inputs"][t["input"]] = int(pw)
-    for t in spec.get("plate_height", []):
-        prompt[t["node"]]["inputs"][t["input"]] = int(ph)
-    for t in spec.get("aspect_text", []):            # the same size as text, e.g. a rewriter's aspect_ratio
-        prompt[t["node"]]["inputs"][t["input"]] = "{}x{}".format(w, h)
+    sizes = (("width", w), ("height", h), ("plate_width", int(pw)), ("plate_height", int(ph)),   # plate_*: back
+             ("aspect_text", "{}x{}".format(w, h)))     # to plate size at the end; aspect_text: e.g. a rewriter's
+    for key, value in sizes:
+        for t in spec.get(key, []):
+            if t["node"] in prompt:                     # text to image may have taken the plate's nodes out
+                prompt[t["node"]]["inputs"][t["input"]] = value
     return "{}x{}".format(w * scale, h * scale)
 
 
@@ -1676,7 +1682,8 @@ def _prepare_refs(group, wf, available, src_dir, stem, src_version, frame, notes
 def _add_refs(prompt, wf, refs):
     """One OCIO Read per reference (a copy of the plate's), wired to the ref's targets. A ref 'slot'
     ({node, input with {} for the number, start, tag}) takes the next free numbered input, so the
-    connected refs are numbered without gaps - as the model's prompt tags count them. Returns tag notes."""
+    connected refs are numbered without gaps - as the model's prompt tags count them. A target's 'via' (a node
+    id with an 'image' input) puts a copy of that node between the ref and the target. Returns tag notes."""
     _bypass_refs(prompt, wf, refs)
     if not refs:
         return []
@@ -1703,7 +1710,14 @@ def _add_refs(prompt, wf, refs):
             targets.append({"node": slot["node"], "input": slot["input"].format(n)})
             tags.append("{}=<{} {}>".format(ref["name"], slot.get("tag", "ref"), n + 1))
         for t in targets:
-            prompt[t["node"]]["inputs"][t["input"]] = [nid, 0]
+            src = [nid, 0]
+            via = t.get("via")                          # a copy of this graph node goes in between (e.g. a downscale)
+            if via and via in prompt:
+                vid = "{}_{}".format(nid, via)
+                prompt[vid] = copy.deepcopy(prompt[via])
+                prompt[vid]["inputs"]["image"] = src
+                src = [vid, 0]
+            prompt[t["node"]]["inputs"][t["input"]] = src
         mirror = ref.get("mirror")                      # also into a second numbered input (a prompt rewriter)
         if mirror:
             n = used.get(mirror["input"], int(mirror.get("start", 0)))
@@ -1965,6 +1979,83 @@ def _apply_media(prompt, wf, send, count):
                                            "max_frames": max(1, count)})
     model[spec["input"]] = [wf["write"]["node"], 0]      # OCIO Write's 'path' output -> the file Gemini reads
     model[spec["mime_input"]] = spec["mime"]
+
+
+RESUME_STATES = ("queued", "rendering", "refining", "no contact")
+
+
+def _seq_pattern(first_file):
+    """'shot.1001.exr' -> 'shot.%04d.exr'."""
+    return re.sub(r"\.(\d+)(\.[^./]+)$", lambda m: ".%0{}d{}".format(len(m.group(1)), m.group(2)), first_file)
+
+
+def _save_job(group, job):
+    """The sent job (minus its live websocket) in a hidden knob, so a reopened script can pick it back up."""
+    if "cg_job" not in group.knobs():
+        knob = nuke.String_Knob("cg_job", "cg_job", "")
+        knob.setFlag(nuke.INVISIBLE)
+        group.addKnob(knob)
+    group["cg_job"].setValue(json.dumps({k: v for k, v in job.items() if k != "watcher"}))
+
+
+def resume_jobs():
+    """onScriptLoad: gizmos still saying queued / rendering were waiting for ComfyUI when Nuke closed. Watch their
+    jobs again - finished ones are brought in as usual. Nodes sent before jobs were saved on the node are rebuilt
+    from ComfyUI's history (that works until ComfyUI restarts)."""
+    if not nuke.GUI:
+        return
+    for n in nuke.allNodes("Group", recurseGroups=True):
+        knobs = n.knobs()
+        if "cg_workflow" not in knobs or "cg_state" not in knobs or "cg_prompt_id" not in knobs:
+            continue
+        if n["cg_state"].value() not in RESUME_STATES or n.fullName() in _jobs:
+            continue
+        job = None
+        if "cg_job" in knobs and n["cg_job"].value():
+            try:
+                job = json.loads(n["cg_job"].value())
+            except ValueError:
+                job = None
+        pid = n["cg_prompt_id"].value()
+        if not job or job.get("prompt_id") != pid:
+            if not pid:
+                continue
+            job = {"prompt_id": pid, "started": time.time(), "rebuild": True}
+        job["group"] = n.fullName()
+        job["host"] = job.get("host") or n["cg_host"].value().strip() or client.DEFAULT_HOST
+        _jobs[n.fullName()] = job
+        _set_status(n, "picking the ComfyUI job back up after Nuke was closed...")
+        threading.Thread(target=_resume, args=(job, workflows().get(n["cg_workflow"].value(), {})),
+                         daemon=True).start()
+
+
+def _resume(job, wf):
+    """Thread: rebuild a job from ComfyUI's history if needed, then watch it like a fresh one."""
+    try:
+        if job.pop("rebuild", False):
+            entry = (client._request(job["host"], "/history/" + job["prompt_id"]) or {}).get(job["prompt_id"])
+            if not entry:
+                raise client.ComfyError("the job is no longer in ComfyUI's history (ComfyUI was restarted?) - "
+                                        "check the outputs folder, or render again")
+            graph = entry["prompt"][2]
+            write = graph.get((wf.get("write") or {}).get("node", ""))
+            if write is None:                             # 'Run enhancer only' sends the graph without its Write
+                job.update({"kind": "enhance", "enhancer_node": (wf.get("enhancer") or {}).get("output_node")})
+            elif _is_text(wf):
+                raise client.ComfyError("a text job can't be picked back up - send it again")
+            else:
+                inputs = write["inputs"]
+                job.update({"result": _seq_pattern(client.write_first_path(job["host"], inputs)),
+                            "first": int(inputs.get("first_frame", 1)), "last": int(inputs.get("last_frame", 1)),
+                            "colorspace": "raw" if inputs.get("raw_data") else inputs.get("output_colorspace", ""),
+                            "crop": "", "offset": ""})
+                if wf.get("enhancer"):
+                    job["enhancer_node"] = wf["enhancer"]["output_node"]
+    except Exception as e:
+        _jobs.pop(job["group"], None)
+        nuke.executeInMainThread(_finish, (job, str(e)))
+        return
+    _poll(job)
 
 
 def _poll(job, in_main=False):
